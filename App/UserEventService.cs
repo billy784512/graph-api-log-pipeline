@@ -1,7 +1,10 @@
+using System.Text.RegularExpressions;
+
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Identity.Client;
+using Microsoft.Graph;
+using Microsoft.Graph.Models;
 
 using Newtonsoft.Json;
 
@@ -34,13 +37,11 @@ namespace AbnormalMeetings
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
             _logger.LogInformation("UserEventService is triggered.");
 
-
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
                 return await ValidationResponse(req);
             }
             return await SaveSubscription(req);
-            
         }
 
         private async Task<HttpResponseData> SaveSubscription(HttpRequestData req){
@@ -59,34 +60,61 @@ namespace AbnormalMeetings
             }
             
             string resource = subscriptionData.value[0].resource;
-            string filename = $"{subscriptionData.value[0].resourceData.id}.json";
-            string webApiUrl = $"{_config.ApiUrl}v1.0/{resource}";
+            string pattern = @"Users/([^/]+)/Events/([^/]+)";
 
-            IConfidentialClientApplication app;
+            Match match = Regex.Match(resource, pattern);
+            if (! match.Success)
+            {
+                _logger.LogError($"Regex match failed, raw data: {resource}");
+                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                await res.WriteStringAsync("Regex match failed");
+                return res;
+            }
+
+            string userId = match.Groups[1].Value;
+            string eventId = match.Groups[2].Value;
 
             try
             {
-                _logger.LogInformation("Login to application...");
-                app = GlobalFunction.GetAppAsync(_config);
-                _logger.LogInformation("Login Successfully.");
+                string[] scopes = [$"{_config.ApiUrl}.default"];
+                Event calendarEvent = await GetUserEventfromGraphSDK(scopes, userId, eventId);
 
-                string[] scopes = [$"{_config.ApiUrl}.default"]; // "https://graph.microsoft.com/.default"
-
-                string userEventJson = await GlobalFunction.GetHttpRequest(app, scopes, webApiUrl, _logger);
-
+                string filename = $"{subscriptionData.value[0].resourceData.id}.json";
+                string jsonString = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
                 string containerName = _config.BlobContainerName_UserEvents;
-                await GlobalFunction.SaveToBlob(filename, userEventJson, CONNECTION_STRING, containerName, _logger);
+
+                await GlobalFunction.SaveToBlob(filename, jsonString, CONNECTION_STRING, containerName, _logger);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");
                 return res;
             }
-            catch (Exception ex){
+            catch (Exception ex)
+            {
                 _logger.LogError(ex.Message);
                 var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
                 await res.WriteStringAsync("SaveSubscription failed");
                 return res;
             }
+        }
+
+        private async Task<Event> GetUserEventfromGraphSDK(string[] scopes, string userId, string eventId)
+        {
+            GraphServiceClient graphServiceClient = GlobalFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
+
+            try
+            {
+                var userEvent = await graphServiceClient.Users[userId].Events[eventId]
+                    .GetAsync();
+                    
+                return userEvent;
+            }
+            catch (ServiceException e)
+            {
+                _logger.LogInformation("GetCallRecordsfromGraphSDK Failed: " + $"{e}");
+            }
+
+            return null;
         }
 
         private async Task<HttpResponseData> ValidationResponse(HttpRequestData req){ 

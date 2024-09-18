@@ -105,7 +105,6 @@ namespace AbnormalMeetings
             return null;
         }
 
-
         private async Task<HttpResponseData> ValidationResponse(HttpRequestData req){ 
             string validationToken = req.Query["validationToken"];
             _logger.LogInformation($"validationToken: {validationToken}");
