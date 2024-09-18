@@ -138,7 +138,7 @@ namespace AbnormalMeetings
 
             // Renew
             if (subscriptionDict.ContainsKey(CALL_RECORD_ID)){
-                await RenewSubscription(graphServiceClient, CALL_RECORD_ID);
+                await RenewSubscription(graphServiceClient, subscriptionDict[CALL_RECORD_ID]);
                 return;
             }
 
