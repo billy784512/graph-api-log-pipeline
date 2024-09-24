@@ -1,41 +1,41 @@
 # microsoft-teams-log-pipeline
 
-## 1. Project Background
+# 1. Project Background
 
-This project aims to track user activaties in Microsfot Teams and store logs in ADX for future retrieval and analysis.
+This project aims to track user activities in Microsoft Teams and store logs in ADX for future retrieval and analysis.
 
-For the tracked user, the following three Teams events will be logged:
+The following Teams events will be logged for each tracked user:
 - **User event**: Events or meetings scheduled in Teams Calendar
 - **Call Record**: Meetings that the user actually joins.
 - **Chat Message**: Messages in the chatroom of meetings the user has joined.
 
-In this project, Following tech stack will be utilize:
-- **Microsoft Graph API**: A unified API endpoint for easy access to data and services from across the Microsoft ecosystem. Here we focus on the usage of the subscrption feature for Teams.
+### Tech Stack:
+- **Microsoft Graph API**: A unified API endpoint to access data and services from the Microsoft ecosystem. This project focuses on the subscription feature for Teams.
 - **Azure**:
-  - **FunctionApp**
-  - **StorageAccount**
-  - **StorageQueue**
-  - **EventHub**
+  - **App Registration**
+  - **Function App**
+  - **Storage Account**
+  - **Storage Queue**
+  - **Event Hub**
   - **Azure Data Explorer (ADX)**
 
 
-## 2. System Architecture
+## 2. System Architecture (Coming soon...)
 
-## 3. Azure resource preparation (By script, recommended)
+## 3. Azure resource preparation
 
-You can use script provided in this repo to create resource, deploy functionApp and config functionApp automatically.
-However, there still have a little bit operations need you perform manually. 
 
-So follow below step-by-step guide!
+You can use the provided scripts to automatically create resources, deploy the Function App, and configure the Function App. 
+However, some manual steps are still required. Follow the step-by-step guide below.
+
 
 ### 3.1 Azure CLI
 
-Install Azure CLI from here:
-https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli
+Install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
 
 
 ```powershell
-# Login
+# Login to Azure
 az login
 az login -- tenant {tenant_id}
 
@@ -43,37 +43,22 @@ az login -- tenant {tenant_id}
 az account set --subscription {subscription_id}
 ```
 
-### 3.2 Run scripts
+### 3.2 Create Azure resources by scripts (recommended)
 
-1. Run `.\Scripts\azure_operation.ps1`, this script will do:
-    1. Create all required resources in your Azure cloud
-2. In previous step, the App Registration required several Graph API permissions, and they need to be granted:
-    1. **If you're tenant admin**, run `az ad app permission admin-consent --id {appId}`, where appId can be found by `az ad app list --displayName {appName}`
-    2. **If you're not tenant admin**, inform your admin to grant.
-3. Follow the output message from `.\Scripts\azure_operation.ps1` to setup `.\App\local.setting.json` file
-    1. Typically, this file is a local environment file to help you develope and debug. But in next step, we will deploy these local variables to Azure FunctionApp.
-4. Run `.\Scripts\functionApp_operation.ps1`, this script will do:
-    1. Deploy the local function project (in `.\App`) to Azure FunctionApp
-    2. Config the Azure FunctionApp environment variable based on `.\App\local.setting.json`
+1. Run `.\Scripts\azure_operation.ps1` to:
+    1. Create all required Azure resources
+2. In the previous step, the App Registration requires several Microsoft Graph API permissions, which need to be granted:
+    1. **If you're a tenant admin**, run `az ad app permission admin-consent --id {appId}`, where appId can be found by `az ad app list --displayName {appName}`
+    2. **If you're not a tenant admin**, request your admin to grant the required permission.
+3. Follow the output message from `.\Scripts\azure_operation.ps1` to set up `.\App\local.setting.json` file
+    1. This file stores local environment variables for development and debugging. In the next step, we will deploy these local variables to the Azure Function App.
+4. Run `.\Scripts\functionApp_operation.ps1` to:
+    1. Deploy the local function project (located in `.\App`) to the Azure Function App
+    2. Configure the Azure Function App environment variables based on `.\App\local.setting.json`
 
-## 4. Azure resource prepartion (Manaual, to be updated soon)
+### 3.3 Create Azure resources manually (to be completed soon...)
 
-### 4.1 Azure CLI
-
-Install Azure CLI from here:
-https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli
-
-
-```powershell
-# Login
-az login
-az login -- tenant {tenant_id}
-
-# Set subscription
-az account set --subscription {subscription_id}
-```
-
-### 4.2 Storage Accounts
+#### 3.3.1 Storage Accounts
 
 **It's a prerequisite for creating a Azure function App**
 
@@ -84,9 +69,9 @@ az storage account create `
 	--sku Standard_LRS
 ```
 
-This storage account will help function App for state management, function scaling, logging, etc.
+The storage account is used for state management, function scaling, logging, etc., in the Function App.
 
-### 4.3 FunctionApps
+#### 3.3.2 FunctionApps
 
 ``` powershell
 # Create a FunctionApp in Azure
@@ -114,13 +99,13 @@ az functionapp deployment source config-zip `
 func azure functionapp publish {function_app_name}
 ```
 
-If you encounter this error message during executing `func azure functionapp publish`:
+If you encounter this error during the execution of `func azure functionapp publish`:
 ```
 Can't determine Project to build. Expected 1 .csproj or .fsproj but found 2
 ```
-The quick workaround is remove `./App/bin` and `./App/obj` folders.
+A quick workaround is to delete the `./App/bin` and `./App/obj` folders.
 
-### 4.4 App Registration (Service Principal)
+#### 3.3.3 App Registration (Service Principal)
 
 ``` powershell
 az ad app create --display-name {your_app_name}
@@ -132,7 +117,7 @@ az ad app permission add --id {appId} --api 00000003-0000-0000-c000-000000000000
 # CallRecords.Read.All
 az ad app permission add --id {appId} --api 00000003-0000-0000-c000-000000000000 --api-permissions 45bbb07e-7321-4fd7-a8f6-3ff27e6a81c8=Role
 
-# Gen a clientSecret
+# Generate a clientSecret
 az ad app credential reset --id $appId --append --years 1
 
 # Grant permissions
@@ -140,4 +125,4 @@ az ad app permission admin-consent --id {appId}
 
 ```
 
-# 5. Init subscriptio & Demo (To be updated soon) 
+## 4. Initialize Subscription & Demo (Coming soon...)
