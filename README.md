@@ -19,8 +19,31 @@ The following Teams events will be logged for each tracked user:
   - **Event Hub**
   - **Azure Data Explorer (ADX)**
 
+** Notice that below instructions assume you use Windows as OS, and powershell as terminal.**
 
-## 2. System Architecture (Coming soon...)
+## 2. Repo Overview (Coming soon...)
+
+### System Architecture
+
+### Repo Structure
+
+Not included files are auto-generated or repo metadata.
+
+```
+📦 teams-log-pipeline
+ ┣ 📂 App
+ ┃ ┣ 📂 daemon_console
+ ┃ ┃ ┣ 📜 AuthenticationConfig.cs
+ ┃ ┃ ┗ 📜 GlobalFunction.cs
+ ┃ ┣ 📂 global_class
+ ┃ ┃ ┗ 📜 Object.cs
+ ┃ ┣ 📜 CallRecordService.cs
+ ┃ ┣ 📜 SubscriptionRenewalService.cs
+ ┃ ┗ 📜 UserEventService.cs
+ ┣ 📂 Scripts
+ ┃ ┣ 📜 azure_operation.ps1
+ ┃ ┗ 📜 functionApp_operation.ps1
+```
 
 ## 3. Azure resource preparation
 
@@ -45,16 +68,23 @@ az account set --subscription {subscription_id}
 
 ### 3.2 Create Azure resources by scripts (recommended)
 
-1. Run `.\Scripts\azure_operation.ps1` to:
-    1. Create all required Azure resources
-2. In the previous step, the App Registration requires several Microsoft Graph API permissions, which need to be granted:
-    1. **If you're a tenant admin**, run `az ad app permission admin-consent --id {appId}`, where appId can be found by `az ad app list --displayName {appName}`
+``` sh
+📦 teams-log-pipeline
+ ┣ 📂 Scripts
+ ┃ ┣ 📜 azure_operation.ps1         #  Create all required Azure resources
+ ┃ ┗ 📜 functionApp_operation.ps1   #  Deploy Function App (include env variables)
+```
+
+1. Run `azure_operation.ps1`
+2. In `azure_operation.ps1`, the App Registration requires several Microsoft Graph API permissions, which need to be granted:
+    1. **If you're a tenant admin**, run `az ad app permission admin-consent --id {appId}`
     2. **If you're not a tenant admin**, request your admin to grant the required permission.
-3. Follow the output message from `.\Scripts\azure_operation.ps1` to set up `.\App\local.setting.json` file
-    1. This file stores local environment variables for development and debugging. In the next step, we will deploy these local variables to the Azure Function App.
-4. Run `.\Scripts\functionApp_operation.ps1` to:
-    1. Deploy the local function project (located in `.\App`) to the Azure Function App
-    2. Configure the Azure Function App environment variables based on `.\App\local.setting.json`
+3. Follow the output messages from `azure_operation.ps1` to set up `App\local.setting.json` file
+    1. `App\local.setting.json` stores local environment variables for development and debugging. 
+    2. In the next step, we will deploy these local variables to Azure Function App.
+4. Run `functionApp_operation.ps1`
+
+**After completing these four steps, all the necessary resources for this project have been successfully created and properly configured in your Azure environment.**
 
 ### 3.3 Create Azure resources manually (to be completed soon...)
 
@@ -126,3 +156,6 @@ az ad app permission admin-consent --id {appId}
 ```
 
 ## 4. Initialize Subscription & Demo (Coming soon...)
+
+
+
