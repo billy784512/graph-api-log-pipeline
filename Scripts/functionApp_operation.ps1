@@ -1,10 +1,10 @@
 # Define the Azure Function App name and resource group
-$functionAppName = Read-Host -Prompt "Enter your Azure FunctionApp name"
+$functionAppName = Read-Host -Prompt "Enter your Azure Function App name"
 $resourceGroup = Read-Host -Prompt "Enter your Azure Resource Group name"
 
 
 # ---------------------- Deployment ----------------------
-Write-Host "Start FunctionApp deployment..." -ForegroundColor Yellow
+Write-Host "Start Function App deployment..." -ForegroundColor Yellow
 
 Set-Location -Path "..\App"
 
@@ -22,12 +22,12 @@ az functionapp deployment source config-zip `
 func azure functionapp publish $functionAppName
 
 Remove-Item -Path ".\app.zip" -Force
-Write-Host "FunctionApp deploy successfully!" -ForegroundColor Green
+Write-Host "Function App deploy successfully!" -ForegroundColor Green
 # ---------------------------------------------------------------------
 
 
 # ---------------------- Env Variables Setting ----------------------
-Write-Host "Start config FunctionApp environment variable..." -ForegroundColor Yellow
+Write-Host "Start config Function App environment variable..." -ForegroundColor Yellow
 
 $localSettingsFile = ".\local.settings.json"
 

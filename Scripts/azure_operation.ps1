@@ -30,7 +30,7 @@ Write-Host "===============================================" -ForegroundColor Gr
 
 # FunctionApp
 Write-Host "===============================================" -ForegroundColor Yellow
-Write-Host "Start creating a new FunctionApp in your Azure..." -ForegroundColor Yellow
+Write-Host "Start creating a new Function App in your Azure..." -ForegroundColor Yellow
 
 az functionapp create --resource-group $resourceGroup `
     --consumption-plan-location "westus" `
@@ -64,7 +64,7 @@ $clientSecret = $clientSecretObject.clientSecret
 $functionDefaultKey = az functionapp keys list --name $functionAppName --resource-group $resourceGroup --query masterKey --output tsv
 
 
-Write-Host "All resources (AppRegistraion, FunctionApp, StorageAccount) have been created successfully!" -ForegroundColor Green
+Write-Host "All resources (App Registraion, Function App, Storage Account) have been created successfully!" -ForegroundColor Green
 Write-Host "Now, please follow below instructions" -ForegroundColor Green
 
 Write-Host "1. inform your tenant admin to grant the API permission requeired by App registration." -ForegroundColor Blue
@@ -80,5 +80,7 @@ Write-Host "FUNCTION_APP_NAME: $functionAppName" -ForegroundColor Yellow
 Write-Host "FUNCTION_DEFAULT_KEY: $functionDefaultKey" -ForegroundColor Yellow
 
 Write-Host "3. Run functionApp_operation.ps1 for functionApp depolyment and configuration" -ForegroundColor Blue
+
+Write-Host "Script done!" -ForegroundColor Green
 
 
