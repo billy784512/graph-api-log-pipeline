@@ -5,7 +5,7 @@
 This project aims to track user activities in Microsoft Teams and store logs in ADX for future retrieval and analysis.
 
 The following Teams events will be logged for each tracked user:
-- **User event**: Events or meetings scheduled in Teams Calendar
+- **User Event**: Events or meetings scheduled in Teams Calendar
 - **Call Record**: Meetings that the user actually joins.
 - **Chat Message**: Messages in the chatroom of meetings the user has joined.
 
