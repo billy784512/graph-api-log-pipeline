@@ -75,9 +75,9 @@ namespace AbnormalMeetings
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in RenewSubscription: {ex.Message}");
+                _logger.LogError($"Error in RenewSubscription(http): {ex.Message}");
                 var res = req.CreateResponse(HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("Error in SubscriptionRenewal, plz check log.");
+                await res.WriteStringAsync("Error in SubscriptionRenewal, please check log.");
                 return res;
             }
         }
@@ -96,11 +96,11 @@ namespace AbnormalMeetings
             }
             catch (ServiceException e)
             {
-                _logger.LogError($"Graph API error: {e.Message}");
+                _logger.LogError($"graphServiceClient error: {e.Message}");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in CallMSGraphUsingGraphSDKAsync: {ex.Message}");
+                _logger.LogError($"Error in CallMSGraphAsync: {ex.Message}");
             }
         }
 
@@ -127,7 +127,7 @@ namespace AbnormalMeetings
         private async Task SaveSubscriptionList(SubscriptionList subscriptionList)
         {
             var jsonString = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
-            await GlobalFunction.SaveToBlob(_config.BlobFileName, jsonString, CONNECTION_STRING, _config.BlobContainerName_SubscriptionList, _logger);
+            await GlobalFunction.SaveToBlobContainer(_config.BlobFileName, jsonString, CONNECTION_STRING, _config.BlobContainerName_SubscriptionList, _logger);
             _logger.LogInformation("Subscription list saved successfully.");
         }
 

@@ -93,7 +93,7 @@ namespace daemon_console
             return app;
         }
 
-        public static async Task SaveToBlob(string file_name, string jsonString, string connectionString, string containerName, ILogger log)
+        public static async Task SaveToBlobContainer(string file_name, string jsonString, string connectionString, string containerName, ILogger log)
         {
 
             BlobContainerClient container = new BlobContainerClient(connectionString, containerName);
@@ -112,7 +112,6 @@ namespace daemon_console
                 // Upload the file to the server
                 await blob.UploadAsync(mem, overwrite: true);
             }
-
         }
 
     }

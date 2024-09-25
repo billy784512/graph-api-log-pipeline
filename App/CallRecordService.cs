@@ -69,7 +69,7 @@ namespace AbnormalMeetings
                 string jsonString = System.Text.Json.JsonSerializer.Serialize(callrecord);
                 string containerName = _config.BlobContainerName_CallRecords;
 
-                await GlobalFunction.SaveToBlob(filename, jsonString, CONNECTION_STRING, containerName, _logger);
+                await GlobalFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");

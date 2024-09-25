@@ -83,7 +83,7 @@ namespace AbnormalMeetings
                 string jsonString = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
                 string containerName = _config.BlobContainerName_UserEvents;
 
-                await GlobalFunction.SaveToBlob(filename, jsonString, CONNECTION_STRING, containerName, _logger);
+                await GlobalFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");
@@ -111,7 +111,7 @@ namespace AbnormalMeetings
             }
             catch (ServiceException e)
             {
-                _logger.LogInformation("GetCallRecordsfromGraphSDK Failed: " + $"{e}");
+                _logger.LogInformation("GetUserEventfromGraphSDK Failed: " + $"{e}");
             }
 
             return null;
