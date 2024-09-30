@@ -9,8 +9,12 @@ Write-Host "Start Function App deployment..." -ForegroundColor Yellow
 Set-Location -Path "..\App"
 
 # Redudant file for deployment
-Remove-Item -Path ".\bin" -Recurse -Force
-Remove-Item -Path ".\obj" -Recurse -Force
+if (Test-Path -Path ".\bin") {
+    Remove-Item -Path ".\bin" -Recurse -Force
+}
+if (Test-Path -Path ".\obj") {
+    Remove-Item -Path ".\obj" -Recurse -Force
+}
 
 Compress-Archive -Path . app.zip
 
