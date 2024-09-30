@@ -1,5 +1,4 @@
 using System.Text;
-using System.Net.Http;
 using System.Net.Http.Headers;
 
 using Microsoft.Graph;
@@ -11,9 +10,9 @@ using Azure.Storage.Blobs;
 using Azure.Identity;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace daemon_console
+namespace App.Utils
 {
-    public class GlobalFunction
+    public class UtilityFunction
     {
         public static void PrintHeaders(HttpHeadersCollection reqHeaders, ILogger log)
         {

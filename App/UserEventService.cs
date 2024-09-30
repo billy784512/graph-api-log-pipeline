@@ -8,23 +8,22 @@ using Microsoft.Graph.Models;
 
 using Newtonsoft.Json;
 
-using daemon_console;
-using global_class;
+using App.Utils;
+using App.Models;
 
-namespace AbnormalMeetings
+namespace App
 {
     public class UserEventService
     {
         private readonly ILogger _logger;
-        private static readonly AuthenticationConfig _config = LoadAuthenticationConfig();
+        private readonly AuthenticationConfig _config;
+
         private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+        
         public UserEventService(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<UserEventService>();
-        }
-        private static AuthenticationConfig LoadAuthenticationConfig()
-        {
-            return new AuthenticationConfig
+            _config = new AuthenticationConfig
             {
                 Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
                 ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
@@ -83,7 +82,7 @@ namespace AbnormalMeetings
                 string jsonString = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
                 string containerName = _config.BlobContainerName_UserEvents;
 
-                await GlobalFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
+                await UtilityFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");
@@ -100,7 +99,7 @@ namespace AbnormalMeetings
 
         private async Task<Event> GetUserEventfromGraphSDK(string[] scopes, string userId, string eventId)
         {
-            GraphServiceClient graphServiceClient = GlobalFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
+            GraphServiceClient graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
 
             try
             {

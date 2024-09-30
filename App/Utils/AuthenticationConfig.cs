@@ -1,11 +1,6 @@
-using System;
 using System.Globalization;
-using Directory = System.IO.Directory;
 
-using Microsoft.Identity.Web;
-using Microsoft.Extensions.Configuration;
-
-namespace daemon_console
+namespace App.Utils
 {
     /// <summary>
     /// Description of the configuration of an AzureAD public client application (desktop/mobile application).
@@ -62,32 +57,5 @@ namespace daemon_console
         /// (and identified by the Certificate property belows)
         /// <remarks> 
         public string ClientSecret { get; set; }
-
-        /// <summary>
-        /// The description of the certificate to be used to authenticate your application.
-        /// </summary>
-        /// <remarks>Daemon applications can authenticate with AAD through two mechanisms: ClientSecret
-        /// (which is a kind of application password: the property above)
-        /// or a certificate previously shared with AzureAD during the application registration 
-        /// (and identified by this CertificateDescription)
-        /// <remarks> 
-        public CertificateDescription Certificate { get; set; }
-
-        /// <summary>
-        /// Reads the configuration from a json file
-        /// </summary>
-        /// <param name="path">Path to the configuration json file</param>
-        /// <returns>AuthenticationConfig read from the json file</returns>
-        public static AuthenticationConfig ReadFromJsonFile(string path)
-        {
-            IConfigurationRoot Configuration;
-
-            var builder = new ConfigurationBuilder()
-             .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile(path);
-
-            Configuration = builder.Build();
-            return Configuration.Get<AuthenticationConfig>();
-        }
     }
 }

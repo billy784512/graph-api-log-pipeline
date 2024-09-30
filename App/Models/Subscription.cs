@@ -1,4 +1,4 @@
-namespace global_class
+namespace App.Models
 {
     public class SubscriptionData
     {

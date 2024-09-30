@@ -7,37 +7,35 @@ using Microsoft.Identity.Client;
 
 using Newtonsoft.Json;
 
-using daemon_console;
-using global_class;
+using App.Utils;
+using App.Models;
 
-namespace AbnormalMeetings
+namespace App
 {
     public class CallRecordService
     {
         private readonly ILogger _logger;
-        private static readonly AuthenticationConfig _config = LoadAuthenticationConfig();
-        private string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+        private readonly AuthenticationConfig _config;
+
+        private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+
         public CallRecordService(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<CallRecordService>();
-        }
-        private static AuthenticationConfig LoadAuthenticationConfig()
-        {
-            return new AuthenticationConfig
-            {
+            _config = new AuthenticationConfig{
                 Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
                 ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
                 ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
             };
         }
-
+        
 
         [Function("CallRecord")]
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
             _logger.LogInformation("CallRecordService is triggered.");
 
-            GlobalFunction.PrintHeaders(req.Headers, _logger);
-            await GlobalFunction.PrintBody(req, _logger);
+            UtilityFunction.PrintHeaders(req.Headers, _logger);
+            await UtilityFunction.PrintBody(req, _logger);
 
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
@@ -69,7 +67,7 @@ namespace AbnormalMeetings
                 string jsonString = System.Text.Json.JsonSerializer.Serialize(callrecord);
                 string containerName = _config.BlobContainerName_CallRecords;
 
-                await GlobalFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
+                await UtilityFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");
@@ -87,7 +85,7 @@ namespace AbnormalMeetings
         private async Task<CallRecord> GetCallRecordsfromGraphSDK(string[] scopes, string call_Id)
         {
             // Prepare an authenticated MS Graph SDK client
-            GraphServiceClient graphServiceClient = daemon_console.GlobalFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
+            GraphServiceClient graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
 
             try
             {

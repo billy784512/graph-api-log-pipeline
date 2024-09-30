@@ -10,35 +10,32 @@ using Azure.Storage.Blobs;
 
 using Newtonsoft.Json;
 
-using daemon_console;
-using global_class;
+using App.Utils;
+using App.Models;
 
-namespace AbnormalMeetings
+namespace App
 {
     public class SubscriptionRenewalService
     {
         private readonly ILogger _logger;
-        private static readonly AuthenticationConfig _config = LoadAuthenticationConfig();
+        private readonly AuthenticationConfig _config;
+
         private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? FUNCTION_APP_NAME = Environment.GetEnvironmentVariable("FUNCTION_APP_NAME").ToLower();
         private readonly string? FUNCTION_DEFAULT_KEY = Environment.GetEnvironmentVariable("FUNCTION_DEFAULT_KEY"); 
-        private const string CALL_RECORD_ID = "callRecordId";
-
+        private readonly string CALL_RECORD_ID = "callRecordId";
 
         public SubscriptionRenewalService(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<SubscriptionRenewalService>();
-        }
-        private static AuthenticationConfig LoadAuthenticationConfig()
-        {
-            return new AuthenticationConfig
+            _config = new AuthenticationConfig
             {
                 Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
                 ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
                 ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
             };
         }
-
+        
 
         [Function("SubscriptionRenewalCronjob")]
         public async Task RunTimer([TimerTrigger("0 0 16 * * *")] TimerInfo myTimer)
@@ -86,7 +83,7 @@ namespace AbnormalMeetings
         {
             try
             {
-                var graphServiceClient = GlobalFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
+                var graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
 
                 var subscriptionList = await LoadSubscriptionList();
 
@@ -127,7 +124,7 @@ namespace AbnormalMeetings
         private async Task SaveSubscriptionList(SubscriptionList subscriptionList)
         {
             var jsonString = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
-            await GlobalFunction.SaveToBlobContainer(_config.BlobFileName, jsonString, CONNECTION_STRING, _config.BlobContainerName_SubscriptionList, _logger);
+            await UtilityFunction.SaveToBlobContainer(_config.BlobFileName, jsonString, CONNECTION_STRING, _config.BlobContainerName_SubscriptionList, _logger);
             _logger.LogInformation("Subscription list saved successfully.");
         }
 
