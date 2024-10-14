@@ -51,7 +51,7 @@ namespace App.Utils
             await producerClient.SendAsync(new[] { eventData });
         }
 
-        public static async Task SaveToBlobContainer(BlobContainerClient containerClient, string file_name, string jsonString)
+        public static async Task SaveToBlobContainer(BlobContainerClient containerClient, string jsonString, string file_name)
         {
             var blobClient = containerClient.GetBlobClient(file_name);
             using (MemoryStream mem = new MemoryStream())

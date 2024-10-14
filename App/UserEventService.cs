@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 
+using Azure.Storage.Blobs;
 using Azure.Messaging.EventHubs.Producer;
 
 using Newtonsoft.Json;
@@ -20,8 +21,10 @@ namespace App
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
 
+        private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
         private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
+        private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
         
         public UserEventService(ILoggerFactory loggerFactory)
         {
@@ -85,13 +88,27 @@ namespace App
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
                 string containerName = _config.BlobContainerName_UserEvents;
 
-                await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
+                bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
 
-                await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
+                if (toggle){
+                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
 
-                var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                await res.WriteStringAsync("SaveSubscription done");
-                return res;
+                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
+
+                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                    await res.WriteStringAsync("SaveSubscription done");
+                    return res;
+                }
+                else{
+                    var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_UserEvents);
+                    containerClient.CreateIfNotExists();
+
+                    await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, fileName);
+
+                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                    await res.WriteStringAsync("SaveSubscription done");
+                    return res;
+                }
             }
             catch (Exception ex)
             {
