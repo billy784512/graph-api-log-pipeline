@@ -1,0 +1,21 @@
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+
+        "CHAT_API_TOGGLE": "",
+        
+        "TENANT_ID": "",
+        "CLIENT_ID": "",
+        "CLIENT_SECRET": "",
+
+        "FUNCTION_APP_NAME": "",
+        "FUNCTION_DEFAULT_KEY": "", 
+
+        "EVENT_HUB_CONNECTION_STRING": "",
+        "EVENT_HUB_NAME": "",
+
+        "BLOB_CONNECTION_STRING": ""
+    }
+}
