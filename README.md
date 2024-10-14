@@ -96,8 +96,8 @@ This script is used for creating required resource in your Azure for this projec
 
 After script execution, you need:
 
-1. **Follow the output messages to set up `App\local.setting.json` file**
-2. **Request your admin to grant the permission requirement in App Registraion**
+1. **Follow the output messages to set up `App\local.setting.json` file, you can directly override the `App\local.setting.json.example` in repo.**
+2. **Request your admin to grant the permission requirement in App Registraion.**
     1. **If you're a tenant admin**, run `az ad app permission admin-consent --id {appId}` or use Azure Portal to grant.
 
 
@@ -124,6 +124,6 @@ Find the URL in Azure Portal first.
 
 ![](/Assets/URL.png)
 
-Copt and paste the URL in `Scripts\req.ps1` and excute it to initialize subscription.
+Copy and paste the URL in `Scripts\req.ps1` and excute it to initialize subscription.
 
 
