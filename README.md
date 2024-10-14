@@ -50,15 +50,11 @@ Files not included are auto-generated or metadata.
 ┗ 📜 req.ps1
 ```
 
-## 3. Azure Resource Preparation
+**Follow [3.](#3-azure-resource-preparation-by-powershell-scripts) to create resources by Powershell scrips.**
 
+**Follow [4.](#4-azure-resource-preparation-by-azure-portal) to create resources by Azure Portal.**
 
-Follow [3.1](#31-create-azure-resources-by-powershell-scripts) to create resources by scrips.
-
-Follw [3.2](#32-create-azure-resources-by-azure-portal-comming-sooooon) to create resources by Azure Portal (manually).
-
-
-### 3.1 Create Azure resources by powershell scripts
+## 3. Azure Resource Preparation (by Powershell scripts)
 
 First, install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
 
@@ -82,7 +78,7 @@ az account set --subscription {subscription_id}
 
 **Please `cd` to `\Scripts` when you excute a script.**
 
-#### 3.1.1 azure_operation.ps1
+### 3.1 azure_operation.ps1
 
 This script is used for creating required resource in your Azure for this project. Below list created resources: 
 
@@ -101,24 +97,24 @@ After script execution, you need:
     1. **If you're a tenant admin**, run `az ad app permission admin-consent --id {appId}` or use Azure Portal to grant.
 
 
-#### 3.1.2 functionApp_operation.ps1
+### 3.2 functionApp_operation.ps1
 
 This script is used for Function App deployment and configure its environment variables.
 
 **Be aware that this script will load the value in `local.settings.json` to configure environment variables, if you don't add value in `local.settings.json`, it won't work.**
 
 
-### 3.2 Create Azure resources by Azure Portal (comming sooooon...)
+## 4 Azure Resource Preparation (by Azure Portal)
 
-#### 3.2.1 App Registration (Service Principal)
+### 4.1 App Registration (Service Principal)
 
-#### 3.2.2 Storage Accounts
+### 4.2 Storage Accounts
 
-#### 3.2.3 Event Hub
+### 4.3 Event Hub
 
-#### 3.2.4 Function App
+### 4.4 Function App
 
-## 4. Initialize Subscription & Demo
+## 5. Initialize Subscription & Demo
 
 Find the URL in Azure Portal first.
 
