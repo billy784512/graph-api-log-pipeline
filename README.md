@@ -53,14 +53,14 @@ Files not included are auto-generated or metadata.
 ## 3. Azure Resource Preparation
 
 
-Refer 3.1 to create resources by scrips.
+Follow [3.1](#31-create-azure-resources-by-powershell-scripts) to create resources by scrips.
 
-Refer 3.2 to create resources by Azure Portal (manually).
+Follw [3.2](#32-create-azure-resources-by-azure-portal-comming-sooooon) to create resources by Azure Portal (manually).
 
 
 ### 3.1 Create Azure resources by powershell scripts
 
-Install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
+First, install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
 
 
 ```powershell
@@ -80,24 +80,21 @@ az account set --subscription {subscription_id}
  ┃ ┗ 📜 functionApp_operation.ps1   #  Deploy Function App (include env variables)
 ```
 
-**Please `cd` to `.\Scripts` everytime you do a script execution.**
+**Please `cd` to `\Scripts` when you excute a script.**
 
 #### 3.1.1 azure_operation.ps1
 
-This script is used for creating required resource in your Azure for this project.
+This script is used for creating required resource in your Azure for this project. Below list created resources: 
 
-Below list created resources: 
-
-1. App Registration with below Microsoft Graph API permissions (need admin grant to activate)
+1. **App Registration** with below Microsoft Graph API permissions (need admin grant to activate)
     1. User.Read.All
     2. Calendar.Read
     3. CallRecords.Read.All
-2. Blob Storage
-    1. It's prerequistie for creating a Function App. Used for state management, function scaling, logging, etc...
-3. Function App
-4. Event Hub
+2. **Blob Storage**
+3. **Function App**
+4. **Event Hub**
 
-After script execution, do:
+After script execution, you need:
 
 1. **Follow the output messages to set up `App\local.setting.json` file**
 2. **Request your admin to grant the permission requirement in App Registraion**
@@ -108,7 +105,7 @@ After script execution, do:
 
 This script is used for Function App deployment and configure its environment variables.
 
-**Be aware that it will load the value in `local.settings.json` to configure environment variables.**
+**Be aware that this script will load the value in `local.settings.json` to configure environment variables, if you don't add value in `local.settings.json`, it won't work.**
 
 
 ### 3.2 Create Azure resources by Azure Portal (comming sooooon...)
@@ -121,7 +118,12 @@ This script is used for Function App deployment and configure its environment va
 
 #### 3.2.4 Function App
 
-## 4. Initialize Subscription & Demo (Coming soon...)
+## 4. Initialize Subscription & Demo
 
+Find the URL in Azure Portal first.
+
+![](/Assets/URL.png)
+
+Copt and paste the URL in `Scripts\req.ps1` and excute it to initialize subscription.
 
 
