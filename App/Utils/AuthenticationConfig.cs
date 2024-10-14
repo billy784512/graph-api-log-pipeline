@@ -12,7 +12,7 @@ namespace App.Utils
         public string BlobContainerName_CallRecords { get; } = "callrecords-container";
         public string BlobContainerName_UserEvents { get; } = "userevents-container";
         public string BlobContainerName_SubscriptionList { get; } = "subscription-container";
-        public string BlobFileName { get; } = "subscriptionList.json";
+        public string SubscriptionListFileName { get; } = "subscriptionList.json";
 
         /// <summary>
         /// instance of Azure AD, for example public Azure or a Sovereign cloud (Azure China, Germany, US government, etc ...)

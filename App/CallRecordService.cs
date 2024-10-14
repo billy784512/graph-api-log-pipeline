@@ -3,7 +3,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Graph;
 using Microsoft.Graph.Models.CallRecords;
-using Microsoft.Identity.Client;
+
+using Azure.Messaging.EventHubs.Producer;
 
 using Newtonsoft.Json;
 
@@ -17,7 +18,8 @@ namespace App
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
 
-        private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+        private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
+        private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
 
         public CallRecordService(ILoggerFactory loggerFactory)
         {
@@ -41,50 +43,54 @@ namespace App
             if (isValidationProcess){
                 return await ValidationResponse(req);
             }
-            return await SaveSubscription(req);
+            return await SendEvent(req);
         }
 
-        private async Task<HttpResponseData> SaveSubscription(HttpRequestData req){
+        private async Task<HttpResponseData> SendEvent(HttpRequestData req){
             string reqBody = await new StreamReader(req.Body).ReadToEndAsync();
-            SubscriptionData subscriptionData = JsonConvert.DeserializeObject<SubscriptionData>(reqBody);
-
-            string meetingID = subscriptionData.value[0].resourceData.id;
-            //string filename = $"{subscriptionData.value[0].resourceData.id}.json";
-            //string webApiUrl = $"{_config.ApiUrl}v1.0/{resource}";
-
-            IConfidentialClientApplication app;
-
-            try{
-                //_logger.LogInformation("Login to application...");
-                //app = GlobalFunction.GetAppAsync(_config);
-                //_logger.LogInformation("Login Successfully.");
-
-                string[] scopes = [$"{_config.ApiUrl}.default"]; //"https://graph.microsoft.com/.default"
-
-                CallRecord callrecord = await GetCallRecordsfromGraphSDK(scopes, meetingID);
-
-                string filename = callrecord.Id + ".json";
-                string jsonString = System.Text.Json.JsonSerializer.Serialize(callrecord);
-                string containerName = _config.BlobContainerName_CallRecords;
-
-                await UtilityFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
-
-                var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                await res.WriteStringAsync("SaveSubscription done");
+            SubscriptionData subscriptionData;
+            try
+            {
+                subscriptionData = JsonConvert.DeserializeObject<SubscriptionData>(reqBody);
+            }
+            catch(JsonException ex)
+            {
+                _logger.LogError($"Failed to deserialize request body: {ex.Message}");
+                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                await res.WriteStringAsync("Invalid request body");
                 return res;
             }
-            catch (Exception ex){
-                _logger.LogError(ex.Message);
-            }
 
-            var badRes = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-            await badRes.WriteStringAsync("SaveSubscription failed");
-            return badRes;
+            string meetingID = subscriptionData.value[0].resourceData.id;
+
+            try
+            {
+                string[] scopes = [$"{_config.ApiUrl}.default"];
+                CallRecord callrecord = await GetCallRecordsfromGraphSDK(scopes, meetingID);
+
+                string fileName = $"{callrecord.Id}.json";
+                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(callrecord);
+                string containerName = _config.BlobContainerName_CallRecords;
+
+                await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
+
+                await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
+
+                var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
+                await res.WriteStringAsync("Send CallRecord logs to EventHub successfully.");
+                return res;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
+                await res.WriteStringAsync("Failed to send CallRecord logs to EventHub");
+                return res;
+            }
         }
 
         private async Task<CallRecord> GetCallRecordsfromGraphSDK(string[] scopes, string call_Id)
         {
-            // Prepare an authenticated MS Graph SDK client
             GraphServiceClient graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
 
             try

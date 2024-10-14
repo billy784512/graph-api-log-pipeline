@@ -20,7 +20,7 @@ namespace App
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
 
-        private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+        private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? FUNCTION_APP_NAME = Environment.GetEnvironmentVariable("FUNCTION_APP_NAME").ToLower();
         private readonly string? FUNCTION_DEFAULT_KEY = Environment.GetEnvironmentVariable("FUNCTION_DEFAULT_KEY"); 
         private readonly string CALL_RECORD_ID = "callRecordId";
@@ -84,12 +84,14 @@ namespace App
             try
             {
                 var graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
+                var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_SubscriptionList);
+                containerClient.CreateIfNotExists();
 
-                var subscriptionList = await LoadSubscriptionList();
+                var subscriptionList = await LoadSubscriptionList(containerClient);
 
                 await RenewOrCreateCallRecordSubscriptions(graphServiceClient, subscriptionList);
                 await RenewOrCreateUserEventSubscriptions(graphServiceClient, subscriptionList);
-                await SaveSubscriptionList(subscriptionList);
+                await SaveSubscriptionList(containerClient, subscriptionList);
             }
             catch (ServiceException e)
             {
@@ -101,17 +103,14 @@ namespace App
             }
         }
 
-        private async Task<SubscriptionList> LoadSubscriptionList()
+        private async Task<SubscriptionList> LoadSubscriptionList(BlobContainerClient containerClient)
         {
-            var containerClient = new BlobContainerClient(CONNECTION_STRING, _config.BlobContainerName_SubscriptionList);
-            containerClient.CreateIfNotExists();
-
-            var blobClient = containerClient.GetBlobClient(_config.BlobFileName);
+            var blobClient = containerClient.GetBlobClient(_config.SubscriptionListFileName);
             if (!await blobClient.ExistsAsync())
             {
                 _logger.LogInformation("Subscription list does not exist. Creating a new one.");
                 var newList = new SubscriptionList { value = new List<SubscriptionInfo>() };
-                await SaveSubscriptionList(newList);
+                await SaveSubscriptionList(containerClient, newList);
                 return newList;
             }
 
@@ -121,10 +120,10 @@ namespace App
             return JsonConvert.DeserializeObject<SubscriptionList>(responseString);
         }
 
-        private async Task SaveSubscriptionList(SubscriptionList subscriptionList)
+        private async Task SaveSubscriptionList(BlobContainerClient containerClient, SubscriptionList subscriptionList)
         {
-            var jsonString = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
-            await UtilityFunction.SaveToBlobContainer(_config.BlobFileName, jsonString, CONNECTION_STRING, _config.BlobContainerName_SubscriptionList, _logger);
+            var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
+            await UtilityFunction.SaveToBlobContainer(containerClient, _config.SubscriptionListFileName, jsonPayload);
             _logger.LogInformation("Subscription list saved successfully.");
         }
 

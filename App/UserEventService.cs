@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 
+using Azure.Messaging.EventHubs.Producer;
+
 using Newtonsoft.Json;
 
 using App.Utils;
@@ -18,7 +20,8 @@ namespace App
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
 
-        private readonly string? CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
+        private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
+        private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
         
         public UserEventService(ILoggerFactory loggerFactory)
         {
@@ -40,10 +43,10 @@ namespace App
             if (isValidationProcess){
                 return await ValidationResponse(req);
             }
-            return await SaveSubscription(req);
+            return await SendEvent(req);
         }
 
-        private async Task<HttpResponseData> SaveSubscription(HttpRequestData req){
+        private async Task<HttpResponseData> SendEvent(HttpRequestData req){
             string reqBody = await new StreamReader(req.Body).ReadToEndAsync();
             SubscriptionData subscriptionData;
             try
@@ -57,7 +60,7 @@ namespace App
                 await res.WriteStringAsync("Invalid request body");
                 return res;
             }
-            
+
             string resource = subscriptionData.value[0].resource;
             string pattern = @"Users/([^/]+)/Events/([^/]+)";
 
@@ -78,11 +81,13 @@ namespace App
                 string[] scopes = [$"{_config.ApiUrl}.default"];
                 Event calendarEvent = await GetUserEventfromGraphSDK(scopes, userId, eventId);
 
-                string filename = $"{subscriptionData.value[0].resourceData.id}.json";
-                string jsonString = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
+                string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
+                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
                 string containerName = _config.BlobContainerName_UserEvents;
 
-                await UtilityFunction.SaveToBlobContainer(filename, jsonString, CONNECTION_STRING, containerName, _logger);
+                await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
+
+                await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
 
                 var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
                 await res.WriteStringAsync("SaveSubscription done");
