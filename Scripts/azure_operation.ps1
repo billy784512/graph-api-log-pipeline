@@ -17,7 +17,7 @@ $eventHubName = "$randomPostfix"
 $policyName = "RootManageSharedAccessKey"
 
 # Helper function to handle errors
-function Handle-Error($errorMessage) {
+function Stop-Script($errorMessage) {
     Write-Host "Error: $errorMessage" -ForegroundColor Red
     exit 1
 }
@@ -32,7 +32,7 @@ try {
         -g $resourceGroup `
         --sku Standard_LRS
 } catch {
-    Handle-Error "Failed to create Storage Account."
+    Stop-Script "Failed to create Storage Account."
 }
 
 Write-Host "Storage Account has been created successfully!" -ForegroundColor Green
@@ -54,7 +54,7 @@ try {
         --name $eventHubName `
         --partition-count 2 
 } catch {
-    Handle-Error "Failed to create Event Hub."
+    Stop-Script "Failed to create Event Hub."
 }
 
 Write-Host "Event Hub has been created successfully!" -ForegroundColor Green
@@ -73,7 +73,7 @@ try {
         --name $functionAppName `
         --storage-account $StorageAccountName
 } catch {
-    Handle-Error "Failed to create Function App."
+    Stop-Script "Failed to create Function App."
 }
 
 Write-Host "Function App has been created successfully!" -ForegroundColor Green
@@ -91,7 +91,7 @@ try {
     az ad app permission add --id $appId --api 00000003-0000-0000-c000-000000000000 --api-permissions 45bbb07e-7321-4fd7-a8f6-3ff27e6a81c8=Role  # CallRecords.Read.All
     $clientSecretObject = az ad app credential reset --id $appId --append --years 1 --query "{clientSecret:password}" --output json | ConvertFrom-Json
 } catch {
-    Handle-Error "Failed to create App Registration or set permissions."
+    Stop-Script "Failed to create App Registration or set permissions."
 }
 
 Write-Host "App Registration has been created successfully!" -ForegroundColor Green
@@ -111,7 +111,8 @@ Write-Host "If you're exactly the tenant admin, run this command to grant:" -For
 Write-Host "az ad app permission admin-consent --id $appId"
 
 Write-Host "2. Paste below info to your local.settings.json" -ForegroundColor Blue
-Write-Host "CHAT_API_TOGGLE: true" -ForegroundColor Yellow
+Write-Host "CHAT_API_TOGGLE: True" -ForegroundColor Yellow
+Write-Host "EVENT_HUB_FEATURE_TOGGLE: True" -ForegroundColor Yellow
 Write-Host "TENANT_ID: $tenantId" -ForegroundColor Yellow
 Write-Host "CLIENT_ID: $appId" -ForegroundColor Yellow
 Write-Host "CLIENT_SECRET: $clientSecret" -ForegroundColor Yellow
