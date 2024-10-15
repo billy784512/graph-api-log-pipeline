@@ -14,6 +14,11 @@ namespace App.Utils
         public string BlobContainerName_SubscriptionList { get; } = "subscription-container";
         public string SubscriptionListFileName { get; } = "subscriptionList.json";
 
+        public string EventHubTopic_ChatMeesages { get; } = "chatmessages-topic";
+        public string EventHubTopic_CallRecords { get; } = "callrecords-topic";
+        public string EventHubTopic_UserEvents { get; } = "userevents-topic";
+
+
         /// <summary>
         /// instance of Azure AD, for example public Azure or a Sovereign cloud (Azure China, Germany, US government, etc ...)
         /// </summary>

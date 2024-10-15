@@ -15,8 +15,6 @@
         "FUNCTION_DEFAULT_KEY": "", 
 
         "EVENT_HUB_CONNECTION_STRING": "",
-        "EVENT_HUB_NAME": "",
-
         "BLOB_CONNECTION_STRING": ""
     }
 }

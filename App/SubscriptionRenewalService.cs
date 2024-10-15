@@ -51,7 +51,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in SubscriptionRenewal(cronjob): {ex.Message}");
+                _logger.LogError($"Failed to excute subscriptionRenewal(cronjob): {ex.Message}");
             }
         }
 
@@ -66,16 +66,12 @@ namespace App
                 _logger.LogInformation("Running Function: CallMSGraphAsync");
                 await CallMSGraphAsync(scopes);
 
-                var res = req.CreateResponse(HttpStatusCode.OK);
-                await res.WriteStringAsync("SubscriptionRenewal executed successfully.");
-                return res;
+                return await UtilityFunction.MakeResponse(req, HttpStatusCode.OK, "SubscriptionRenewal executed successfully.");
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error in RenewSubscription(http): {ex.Message}");
-                var res = req.CreateResponse(HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("Error in SubscriptionRenewal, please check log.");
-                return res;
+                return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to excute subscriptionRenewal(http): {ex.Message}");
             }
         }
 
@@ -123,7 +119,7 @@ namespace App
         private async Task SaveSubscriptionList(BlobContainerClient containerClient, SubscriptionList subscriptionList)
         {
             var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
-            await UtilityFunction.SaveToBlobContainer(containerClient, _config.SubscriptionListFileName, jsonPayload);
+            await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, _config.SubscriptionListFileName);
             _logger.LogInformation("Subscription list saved successfully.");
         }
 
@@ -181,7 +177,7 @@ namespace App
         private Subscription MakeSubscriptionObject(bool userEventMode, string? userId=null){
 
             string Resource = userEventMode ? $"/users/{userId}/events" : "/communications/callRecords";
-            string changeType = userEventMode ? "created,updated" : "created";
+            string changeType = userEventMode ? "created" : "created";
             string urlCode = userEventMode ? "UserEvent" : "CallRecord";
 
             string endpointTemplateString = "https://{0}.azurewebsites.net/api/{1}?code={2}&clientId=default";

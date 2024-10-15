@@ -1,3 +1,5 @@
+using System.Net;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -21,7 +23,7 @@ namespace App
 
         private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
+        // private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
         private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
         
         public CallRecordService(ILoggerFactory loggerFactory)
@@ -39,12 +41,9 @@ namespace App
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
             _logger.LogInformation("CallRecordService is triggered.");
 
-            UtilityFunction.PrintHeaders(req.Headers, _logger);
-            await UtilityFunction.PrintBody(req, _logger);
-
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
-                return await ValidationResponse(req);
+                return await UtilityFunction.GraphNotificationValidationResponse(req);
             }
             return await SendEvent(req);
         }
@@ -73,18 +72,16 @@ namespace App
 
                 string fileName = $"{callrecord.Id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(callrecord);
-                string containerName = _config.BlobContainerName_CallRecords;
+                // string containerName = _config.BlobContainerName_CallRecords;
 
                 bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
-                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
+                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_CallRecords);
 
-                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
+                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, fileName);
 
-                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                    await res.WriteStringAsync("Send CallRecord logs to EventHub successfully.");
-                    return res;
+                    return await UtilityFunction.MakeResponse(req, HttpStatusCode.Accepted, "Send log to Event Hub successfully.");
                 }
                 else{
                     var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_CallRecords);
@@ -92,17 +89,13 @@ namespace App
 
                     await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, fileName);
 
-                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                    await res.WriteStringAsync("SaveSubscription done");
-                    return res;
+                    return await UtilityFunction.MakeResponse(req, HttpStatusCode.Accepted, "Save log to Sotrage Account successfully.");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message);
-                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("Failed to send CallRecord logs to EventHub");
-                return res;
+                return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to redirect logs: {ex.Message}");
             }
         }
 
@@ -124,15 +117,6 @@ namespace App
                 _logger.LogInformation("GetCallRecordsfromGraphSDK Failed: " + $"{e}");
             }
             return null;
-        }
-
-        private async Task<HttpResponseData> ValidationResponse(HttpRequestData req){ 
-            string validationToken = req.Query["validationToken"];
-            _logger.LogInformation($"validationToken: {validationToken}");
-
-            var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            await res.WriteStringAsync($"{validationToken}");
-            return res;
         }
     }
 }

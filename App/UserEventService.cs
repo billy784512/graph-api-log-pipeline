@@ -23,7 +23,7 @@ namespace App
 
         private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
+        // private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
         private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
         
         public UserEventService(ILoggerFactory loggerFactory)
@@ -44,7 +44,7 @@ namespace App
 
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
-                return await ValidationResponse(req);
+                return await UtilityFunction.GraphNotificationValidationResponse(req);
             }
             return await SendEvent(req);
         }
@@ -86,18 +86,16 @@ namespace App
 
                 string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
-                string containerName = _config.BlobContainerName_UserEvents;
+                // string containerName = _config.BlobContainerName_UserEvents;
 
                 bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
-                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, EVENT_HUB_NAME);
+                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_UserEvents);
 
-                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, containerName, fileName);
+                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, fileName);
 
-                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                    await res.WriteStringAsync("SaveSubscription done");
-                    return res;
+                    return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.Accepted, "Send log to Event Hub successfully.");
                 }
                 else{
                     var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_UserEvents);
@@ -105,17 +103,13 @@ namespace App
 
                     await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, fileName);
 
-                    var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-                    await res.WriteStringAsync("SaveSubscription done");
-                    return res;
+                    return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.Accepted, "Save log to Sotrage Account successfully.");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex.Message);
-                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("SaveSubscription failed");
-                return res;
+                return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to redirect logs: {ex.Message}");
             }
         }
 
@@ -136,15 +130,6 @@ namespace App
             }
 
             return null;
-        }
-
-        private async Task<HttpResponseData> ValidationResponse(HttpRequestData req){ 
-            string validationToken = req.Query["validationToken"];   
-            _logger.LogInformation($"validationToken: {validationToken}");
-
-            var res = req.CreateResponse(System.Net.HttpStatusCode.OK);
-            await res.WriteStringAsync($"{validationToken}");
-            return res;
         }
     }
 }

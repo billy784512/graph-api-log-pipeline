@@ -1,4 +1,5 @@
 using System.Text;
+using System.Net;
 
 using Microsoft.Graph;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,17 @@ namespace App.Utils
             log.LogInformation($"Request Body: {body}"); 
         }
 
+        public static async Task<HttpResponseData> MakeResponse(HttpRequestData req, HttpStatusCode statusCode, string message){
+            var res = req.CreateResponse(statusCode);
+            await res.WriteStringAsync(message);
+            return res;
+        }
+
+        public static async Task<HttpResponseData> GraphNotificationValidationResponse(HttpRequestData req){
+            string validationToken = req.Query["validationToken"];
+            return await MakeResponse(req, HttpStatusCode.OK, $"{validationToken}" );
+        }
+
         public static GraphServiceClient GetAuthenticatedGraphClient(string tenantId, string clientId, string clientSecret, string[] scopes)
         {
             // Create the credential using Azure.Identity
@@ -41,23 +53,22 @@ namespace App.Utils
             return graphClient;
         }
 
-        public static async Task SendToEventHub(EventHubProducerClient producerClient, string jsonPayload, string eventType, string fileName){
+        public static async Task SendToEventHub(EventHubProducerClient producerClient, string jsonPayload, string fileName){
             var eventData = new EventData(Encoding.UTF8.GetBytes(jsonPayload));
 
             eventData.Properties["Format"] = "JSON";
-            eventData.Properties["EventType"] = eventType;
             eventData.Properties["FileNane"] = fileName;
 
             await producerClient.SendAsync(new[] { eventData });
         }
 
-        public static async Task SaveToBlobContainer(BlobContainerClient containerClient, string jsonString, string file_name)
+        public static async Task SaveToBlobContainer(BlobContainerClient containerClient, string jsonPayload, string file_name)
         {
             var blobClient = containerClient.GetBlobClient(file_name);
             using (MemoryStream mem = new MemoryStream())
             {
                 // Write to stream
-                Byte[] info = new UTF8Encoding(true).GetBytes(jsonString);
+                Byte[] info = new UTF8Encoding(true).GetBytes(jsonPayload);
                 mem.Write(info, 0, info.Length);
 
                 // Go back to beginning of stream
