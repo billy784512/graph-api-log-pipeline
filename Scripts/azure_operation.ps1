@@ -13,7 +13,8 @@ $StorageAccountName = "$resourceGroup$randomPostfix"
 $functionAppName = "teams-log-pipeline-$randomPostfix"
 $appName = "teams-log-pipeline-$randomPostfix"
 $eventHubNamespace = "teams-log-pipeline-$randomPostfix"
-$eventHubName = "$randomPostfix"
+
+$eventHubNameList = @("userevents-topic", "callrecords-topic", "chatmessages-topic")
 $policyName = "RootManageSharedAccessKey"
 
 # Helper function to handle errors
@@ -47,12 +48,14 @@ try {
         --resource-group $resourceGroup `
         --name $eventHubNamespace `
         --location "westus"
-    
-    az eventhubs eventhub create `
-        --resource-group $resourceGroup `
-        --namespace-name $eventHubNamespace `
-        --name $eventHubName `
-        --partition-count 2 
+
+    foreach ($eventHubName in $eventHubNameList) {
+        az eventhubs eventhub create `
+            --resource-group $resourceGroup `
+            --namespace-name $eventHubNamespace `
+            --name $eventHubName `
+            --partition-count 2
+    } 
 } catch {
     Stop-Script "Failed to create Event Hub."
 }
@@ -119,7 +122,6 @@ Write-Host "CLIENT_SECRET: $clientSecret" -ForegroundColor Yellow
 Write-Host "FUNCTION_APP_NAME: $functionAppName" -ForegroundColor Yellow
 Write-Host "FUNCTION_DEFAULT_KEY: $functionDefaultKey" -ForegroundColor Yellow
 Write-Host "EVENT_HUB_CONNECTION_STRING: $eventHubConnectionString" -ForegroundColor Yellow
-Write-Host "EVENT_HUB_NAME: $eventHubName" -ForegroundColor Yellow
 Write-Host "BLOB_CONNECTION_STRING: $storageConnectionString" -ForegroundColor Yellow
 
 Write-Host "3. Run functionApp_operation.ps1 for Function App deployment and configuration." -ForegroundColor Blue
