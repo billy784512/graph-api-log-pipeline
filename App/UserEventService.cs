@@ -21,11 +21,13 @@ namespace App
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
 
+        private EventHubProducerClient _producerClient;
+        private BlobContainerClient _containerClient;
+
         private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
         private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
-        // private readonly string? EVENT_HUB_NAME = Environment.GetEnvironmentVariable("EVENT_HUB_NAME");
         private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
-        
+
         public UserEventService(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<UserEventService>();
@@ -35,6 +37,9 @@ namespace App
                 ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
                 ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
             };
+            _producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_UserEvents);
+            _containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_UserEvents);
+            _containerClient.CreateIfNotExists();
         }
 
 
@@ -59,9 +64,7 @@ namespace App
             catch(JsonException ex)
             {
                 _logger.LogError($"Failed to deserialize request body: {ex.Message}");
-                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("Invalid request body");
-                return res;
+                return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to deserialize request body: {ex.Message}.");
             }
 
             string resource = subscriptionData.value[0].resource;
@@ -71,9 +74,7 @@ namespace App
             if (! match.Success)
             {
                 _logger.LogError($"Regex match failed, raw data: {resource}");
-                var res = req.CreateResponse(System.Net.HttpStatusCode.BadRequest);
-                await res.WriteStringAsync("Regex match failed");
-                return res;
+                return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, "Regex match failed.");
             }
 
             string userId = match.Groups[1].Value;
@@ -86,23 +87,15 @@ namespace App
 
                 string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
-                // string containerName = _config.BlobContainerName_UserEvents;
 
                 bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
-                    await using var producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_UserEvents);
-
-                    await UtilityFunction.SendToEventHub(producerClient, jsonPayload, fileName);
-
+                    await UtilityFunction.SendToEventHub(_producerClient, jsonPayload, fileName);
                     return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.Accepted, "Send log to Event Hub successfully.");
                 }
                 else{
-                    var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_UserEvents);
-                    containerClient.CreateIfNotExists();
-
-                    await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, fileName);
-
+                    await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, fileName);
                     return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.Accepted, "Save log to Sotrage Account successfully.");
                 }
             }
