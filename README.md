@@ -2,15 +2,16 @@
 
 # 1. Project Background
 
-This project aims to track user activities in Microsoft Teams and store logs in ADX for future retrieval and analysis.
+This project aims to track user activities in Microsoft Teams via Microsoft Graph API change notifications and store logs for future retrieval and analysis.
 
-The following Teams events will be logged for each tracked user:
+The following Microsoft Teams events will be logged for each tracked user:
 - **User Event**: Events or meetings scheduled in Teams Calendar
 - **Call Record**: Meetings that the user actually joins.
 - **Chat Message**: Messages in the chatroom of meetings the user has joined.
 
 ### Required Resources:
-- **Microsoft Graph API**: A unified API endpoint to access data and services from the Microsoft ecosystem. This project focuses on the subscription feature for Teams.
+- **Microsoft Graph API**: A unified API endpoint to access data and services from the Microsoft ecosystem. This project focuses its change notification feature.
+  - **change notification**: When tracked event is happend (e.g. a new canledar event is created), Microsoft Graph API will notify given webhook URL.
 - **Azure**:
   - **App Registration**
   - **Function App**
@@ -24,7 +25,39 @@ The following Teams events will be logged for each tracked user:
 ## 2. Repo Overview
 
 ### System Architecture
-Comming Sooooooooon...
+
+Reference:
+- [Microsoft Graph API change notifications](https://learn.microsoft.com/en-us/graph/api/resources/change-notifications-api-overview?view=graph-rest-1.0)
+- [subscription resource type](https://learn.microsoft.com/en-us/graph/api/resources/subscription?view=graph-rest-1.0)
+
+<br/>
+
+![](/Assets/subscription.png)
+
+Creating subscriptions is the prerequisite to activate Graph API change notification. 
+- The purpose of subscription resource type is to tell Graph API who and waht events have to track."
+- The subscriptions have expire time, so renew process is needed.
+  - Store the subscription list to blob storage for facliating renew process. 
+
+<br/>
+
+![](/Assets/log-pipeline.png)
+
+After subscribed event is triggered, Graph API will send a HTTP request to a webhook URL.
+- The webhook URL can be customized during subscription creating.
+- There are several log redirection services to handle notification .
+
+<br/>
+
+Then, Log redirection services will:
+- Parse incoming HTTP body to log (JSON).
+- Pass logs to Event Hub.
+- Store logs to Storage Account for persistent storage (optional).
+
+<br/>
+
+Finally, Azure Fabric consumes logs in EventHub consistently.
+
 
 ### Repo Structure
 
@@ -52,11 +85,15 @@ Files not included are auto-generated or metadata.
 
 **Follow [3.](#3-azure-resource-preparation-by-powershell-scripts) to create resources by Powershell scrips.**
 
-**Follow [4.](#4-azure-resource-preparation-by-azure-portal) to create resources by Azure Portal.**
+**Check [4.](#4-azure-resource-preparation-by-azure-portal) if you want to create resources manually in Azure Portal.**
 
 ## 3. Azure Resource Preparation (by Powershell scripts)
 
-First, install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
+prerequisite:
+
+- Install Azure CLI from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli)
+- Install Azure Function App Core Tools (Node.js evnrionment required)
+  - `npm install -g azure-functions-core-tools@4 --unsafe-perm true`  
 
 
 ```powershell
