@@ -1,6 +1,6 @@
 # microsoft-teams-log-pipeline
 
-# 1. Project Background
+## 1. Project Background
 
 This project aims to track user activities in Microsoft Teams via Microsoft Graph API change notifications and store logs for future retrieval and analysis.
 
@@ -18,7 +18,7 @@ The following Microsoft Teams events will be logged for each tracked user:
   - **Storage Account**
   - **Storage Queue**
   - **Event Hub**
-  - **Azure Data Explorer (ADX)**
+  - **Azure Data Explorer (ADX) / Azure Fabric** 
 
 **Notice that below instructions assume you use Windows as OS, and powershell as terminal.**
 
