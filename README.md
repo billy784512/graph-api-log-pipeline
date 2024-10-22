@@ -13,17 +13,18 @@ This project leverages **Microsoft Graph API change notifications** to store log
 - **Subscription to specific resources:**
   - **User Events**: Logs user events such as calendar updates.
   - **Call Records**: Captures call record details for analysis.
-  - **Chat Messages**: Tracks chat messages, limited to specific **channels**.
+  - **Chat Messages**: Tracks chat messages, limited to **the chatroom in a call**.
 
 
 ## Overview of Subscribed Resource
 
-| **Resource Name**     | **Description**                                                                                   |
-|-----------------------|---------------------------------------------------------------------------------------------------|
-| user (events)         | Tracks user-related events such as calendar changes. (`/user/{userId}/events`)                    |
-| callRecords           | Monitors and stores details of calls for future analysis. (`/communications/callRecords`)         |
-| chatMessages          | Logs messages from specified channels only. (`/chats/{id}/messages`)                              |
+| **Resource Name** | **Description**                                                           | **Changed Type** | **Graph API Path**            |
+|-------------------|---------------------------------------------------------------------------|------------------|-------------------------------|
+| user (events)     | User-related events. (e.g. calendar changes)                              | Created          | `/user/{userId}/events`       |
+| callRecords       | Details of a Teams call.                                                  | Created          | `/communications/callRecords` |
+| chatMessages      | Mmessages in a chat. (in this project, only chat of call will be tracked) | X                | `/chats/{chatId}/messages`    |
 
+**Notice:** Because we only want to track messages in the chatroom in a call, we query chatMessages with `chatId` from Graph API directly, instead of creating a subscribtion.
 
 ## Architecture
 
@@ -177,7 +178,7 @@ This script is used for Function App deployment and configure its environment va
 
 The storage Accounts will auto-create during creating Function App, so **no need** to create it manaully.
 
-Required credentials:
+**Required credentials**:
 - **Connection string** (in "Access keys" tab)
 
 ### Event Hub
@@ -186,7 +187,7 @@ Create the Event Hub Namespace first, then add three Event Hub in the namespace.
 
 The names these three entities must be ["userevents-topic", "callrecords-topic", "chatmessages-topic"].
 
-Required credentials:
+**Required credentials**:
 - **Connection string** (in "Shared access policies" tab)
 
 ### Function App
