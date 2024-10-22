@@ -80,7 +80,7 @@ Files not included are auto-generated or metadata.
 ┣ 📜host.json
 ┣ 📜local.settings.json
 ┣ 📜Program.cs
-┣ 📜SubscriptionRenewalService.cs    # Subscription Service
+┣ 📜SubscriptionService.cs           # Subscription Service
 ┗ 📜UserEventService.cs              # Log Redirection Service
 📂 Scripts
 ┣ 📜 azure_operation.ps1
@@ -125,22 +125,12 @@ Files not included are auto-generated or metadata.
   - `npm install -g azure-functions-core-tools@4 --unsafe-perm true`  
 
 
-```powershell
-# Login to Azure
-az login
-az login -- tenant {tenant_id}
-
-# Set subscription
-az account set --subscription {subscription_id}
-```
-
-
 ``` sh
 📦 teams-log-pipeline
  ┣ 📂 Scripts
  ┃ ┣ 📜 azure_operation.ps1         #  Create all required Azure resources
  ┃ ┣ 📜 functionApp_operation.ps1   #  Deploy Function App (include env variables)
- ┃ ┗ 📜 req.ps1                     #  
+ ┃ ┗ 📜 req.ps1                     #  Utility script for sending http request easily
 ```
 
 ### azure_operation.ps1
@@ -178,21 +168,17 @@ This script is used for Function App deployment and configure its environment va
 1. Grant the Graph API permissions mentioned in [here](#2-graph-api-access-with-appropriate-permissions-in-app-registration).
 2. Generate a client secret in "Certificates & secrets" tab.
 
-</br>
-
-Requried credentials:
-- client ID
-- tenant ID
-- client Secret (generated in step 2.)
+**Requried credentials**:
+- **client ID**
+- **tenant ID**
+- **client Secret** (generated in step 2.)
 
 ### Storage Accounts
 
 The storage Accounts will auto-create during creating Function App, so **no need** to create it manaully.
 
-</br>
-
 Required credentials:
-- Connection string (in "Access keys" tab)
+- **Connection string** (in "Access keys" tab)
 
 ### Event Hub
 
@@ -200,10 +186,8 @@ Create the Event Hub Namespace first, then add three Event Hub in the namespace.
 
 The names these three entities must be ["userevents-topic", "callrecords-topic", "chatmessages-topic"].
 
-</br>
-
 Required credentials:
-- Connection string (in "Shared access policies" tab)
+- **Connection string** (in "Shared access policies" tab)
 
 ### Function App
 
@@ -212,11 +196,9 @@ Create a Function App with following configuration:
 - Version: 8, isolated worker model
 - Operating System: Windows
 
-</br>
-
-Required credentials:
-- FUNCTION_APP_NAME
-- _master key (in "App keys" tab)
+**Required credentials**:
+- **FUNCTION_APP_NAME**
+- **_master key** (in "App keys" tab)
 
 ### Environment configuration in Function App
 
