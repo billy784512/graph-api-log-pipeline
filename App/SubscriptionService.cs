@@ -178,7 +178,7 @@ namespace App
 
             string Resource = userEventMode ? $"/users/{userId}/events" : "/communications/callRecords";
             string changeType = userEventMode ? "created" : "created";
-            string urlCode = userEventMode ? "UserEvent" : "CallRecord";
+            string urlCode = userEventMode ? "UserEventService" : "CallRecordService";
 
             string endpointTemplateString = "https://{0}.azurewebsites.net/api/{1}?code={2}&clientId=default";
             string webhookUrl = String.Format(endpointTemplateString, FUNCTION_APP_NAME, urlCode, FUNCTION_DEFAULT_KEY);
