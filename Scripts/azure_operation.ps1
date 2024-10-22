@@ -18,6 +18,7 @@ function Get-AzLogin{
 }
 
 # Login
+Write-Host "Check Azure login status..."
 if (!(Get-AzLogin)) {
     try {
         Write-Host "You've not login yet. This process try login now..."
@@ -29,6 +30,8 @@ if (!(Get-AzLogin)) {
     } catch {
         Stop-Script "Failed to login Azure"
     }
+} else {
+    Write-Host "You've logged in successfully." -ForegroundColor Green
 }
 
 # Get user-input related info.

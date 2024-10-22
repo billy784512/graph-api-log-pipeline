@@ -18,9 +18,10 @@ function Get-AzLogin{
 }
 
 # Login
+Write-Host "Check Azure login status..."
 if (!(Get-AzLogin)) {
     try {
-        Write-Host "You've not login yet. This process try login now..."
+        Write-Host "You've not logged in yet. This process try login now..."
         $tenantId = Read-Host -Prompt "Enter your tenant id"
         $subscriptionId = Read-Host -Prompt "Enter your subscription id"
         az login -- tenant $tenantId
@@ -29,6 +30,8 @@ if (!(Get-AzLogin)) {
     } catch {
         Stop-Script "Failed to login Azure"
     }
+} else {
+    Write-Host "You've logged in successfully." -ForegroundColor Green
 }
 
 # Define the Azure Function App name and resource group
