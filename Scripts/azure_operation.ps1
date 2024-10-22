@@ -1,12 +1,45 @@
+function Stop-Script($errorMessage) {
+    Write-Host "Error: $errorMessage, exit code 1" -ForegroundColor Red
+    exit 1
+}
+
+function Get-AzLogin{
+    $azLoginCheck = az account show --query "{name:name}" --output tsv 2>&1
+
+    if ($azLoginCheck -like "*Please run 'az login'*") {
+        return $false
+    } 
+    elseif ($azLoginCheck -eq ""){
+        return $false
+    } 
+    else {
+        return $true
+    }
+}
+
+# Login
+if (!(Get-AzLogin)) {
+    try {
+        Write-Host "You've not login yet. This process try login now..."
+        $tenantId = Read-Host -Prompt "Enter your tenant id"
+        $subscriptionId = Read-Host -Prompt "Enter your subscription id"
+        az login -- tenant $tenantId
+        az account set --subscription $subscriptionId
+        Write-Host "Login successfully..." -ForegroundColor Green
+    } catch {
+        Stop-Script "Failed to login Azure"
+    }
+}
+
+# Get user-input related info.
+$resourceGroup = Read-Host -Prompt "Enter your Azure Resource Group name"
+
 # Generate a random postfix to prevent duplicated resource name
 $length = 4
 $characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
 $randomIndices = @(1..$length | ForEach-Object { Get-Random -Minimum 0 -Maximum $characters.Length })
 $randomPostfix = -join ($randomIndices | ForEach-Object { $characters[$_] })
-
-# Get user-input related info.
-$resourceGroup = Read-Host -Prompt "Enter your Azure Resource Group name"
 
 # Define resource name
 $StorageAccountName = "$resourceGroup$randomPostfix"
@@ -16,12 +49,6 @@ $eventHubNamespace = "teams-log-pipeline-$randomPostfix"
 
 $eventHubNameList = @("userevents-topic", "callrecords-topic", "chatmessages-topic")
 $policyName = "RootManageSharedAccessKey"
-
-# Helper function to handle errors
-function Stop-Script($errorMessage) {
-    Write-Host "Error: $errorMessage" -ForegroundColor Red
-    exit 1
-}
 
 # Account Storage
 Write-Host "===============================================" -ForegroundColor Yellow
@@ -90,7 +117,7 @@ try {
     $app = az ad app create --display-name $appName --query appId --output json
     $appId = $app | ConvertFrom-Json 
     az ad app permission add --id $appId --api 00000003-0000-0000-c000-000000000000 --api-permissions df021288-bdef-4463-88db-98f22de89214=Role  # User.Read.All
-    az ad app permission add --id $appId --api 00000003-0000-0000-c000-000000000000 --api-permissions 798ee544-9d2d-430c-a058-570e29e34338=Role  # Calendar.Read
+    az ad app permission add --id $appId --api 00000003-0000-0000-c000-000000000000 --api-permissions 798ee544-9d2d-430c-a058-570e29e34338=Role  # Calendars.Read
     az ad app permission add --id $appId --api 00000003-0000-0000-c000-000000000000 --api-permissions 45bbb07e-7321-4fd7-a8f6-3ff27e6a81c8=Role  # CallRecords.Read.All
     $clientSecretObject = az ad app credential reset --id $appId --append --years 1 --query "{clientSecret:password}" --output json | ConvertFrom-Json
 } catch {
@@ -126,4 +153,5 @@ Write-Host "BLOB_CONNECTION_STRING: $storageConnectionString" -ForegroundColor Y
 
 Write-Host "3. Run functionApp_operation.ps1 for Function App deployment and configuration." -ForegroundColor Blue
 
-Write-Host "Script done!" -ForegroundColor Green
+Write-Host "Script done! exit code 0" -ForegroundColor Green
+exit 0
