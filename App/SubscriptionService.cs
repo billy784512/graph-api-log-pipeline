@@ -15,7 +15,7 @@ using App.Models;
 
 namespace App
 {
-    public class SubscriptionRenewalService
+    public class SubscriptionService
     {
         private readonly ILogger _logger;
         private readonly AuthenticationConfig _config;
@@ -25,9 +25,9 @@ namespace App
         private readonly string? FUNCTION_DEFAULT_KEY = Environment.GetEnvironmentVariable("FUNCTION_DEFAULT_KEY"); 
         private readonly string CALL_RECORD_ID = "callRecordId";
 
-        public SubscriptionRenewalService(ILoggerFactory loggerFactory)
+        public SubscriptionService(ILoggerFactory loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger<SubscriptionRenewalService>();
+            _logger = loggerFactory.CreateLogger<SubscriptionService>();
             _config = new AuthenticationConfig
             {
                 Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
@@ -37,7 +37,7 @@ namespace App
         }
         
 
-        [Function("SubscriptionRenewalCronjob")]
+        [Function("SubscriptionServiceCronjob")]
         public async Task RunTimer([TimerTrigger("0 0 16 * * *")] TimerInfo myTimer)
         {
             _logger.LogInformation($"SubscriptionRenewal(cronjob) executed at: {DateTime.Now}");
@@ -55,7 +55,7 @@ namespace App
             }
         }
 
-        [Function("SubscriptionRenewalHttp")]
+        [Function("SubscriptionServiceHttp")]
         public async Task<HttpResponseData> RunHttp([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req){
             _logger.LogInformation("SubscriptionRenewal(http) executed");
 

@@ -43,7 +43,7 @@ namespace App
         }
 
 
-        [Function("UserEvent")]
+        [Function("UserEventService")]
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
             _logger.LogInformation("UserEventService is triggered.");
 

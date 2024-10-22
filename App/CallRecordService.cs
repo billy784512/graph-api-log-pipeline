@@ -42,7 +42,7 @@ namespace App
         }
         
 
-        [Function("CallRecord")]
+        [Function("CallRecordService")]
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
             _logger.LogInformation("CallRecordService is triggered.");
 
