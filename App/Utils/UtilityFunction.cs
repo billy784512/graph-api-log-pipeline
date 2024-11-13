@@ -42,17 +42,6 @@ namespace App.Utils
             return await MakeResponse(req, HttpStatusCode.OK, $"{validationToken}" );
         }
 
-        public static GraphServiceClient GetAuthenticatedGraphClient(string tenantId, string clientId, string clientSecret, string[] scopes)
-        {
-            // Create the credential using Azure.Identity
-            var clientSecretCredential = new ClientSecretCredential(tenantId, clientId, clientSecret);
-
-            // Pass the credential and scopes to the GraphServiceClient
-            var graphClient = new GraphServiceClient(clientSecretCredential, scopes);
-
-            return graphClient;
-        }
-
         public static async Task SendToEventHub(EventHubProducerClient producerClient, string jsonPayload, string fileName){
             var eventData = new EventData(Encoding.UTF8.GetBytes(jsonPayload));
 
