@@ -1,12 +1,10 @@
 using System.Text;
 using System.Net;
 
-using Microsoft.Graph;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Functions.Worker.Http;
 
 using Azure.Storage.Blobs;
-using Azure.Identity;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
 

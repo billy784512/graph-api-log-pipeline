@@ -1,10 +1,10 @@
 using System.Net;
 
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 
 using Azure.Storage.Blobs;
 
@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using App.Utils;
 using App.Models;
 using App.Factory;
+
 
 namespace App
 {

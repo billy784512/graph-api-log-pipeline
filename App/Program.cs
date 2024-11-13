@@ -1,15 +1,14 @@
-
 using Microsoft.Graph;
 using Microsoft.Azure.Functions.Worker;
-
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 using Azure.Identity;
 
 using App.Utils;
 using App.Factory;
+
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication()
