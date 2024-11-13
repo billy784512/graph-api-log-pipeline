@@ -12,28 +12,30 @@ using Newtonsoft.Json;
 
 using App.Utils;
 using App.Models;
+using App.Factory;
 
 namespace App
 {
     public class SubscriptionService
     {
         private readonly ILogger _logger;
-        private readonly AuthenticationConfig _config;
+        private readonly AppConfig _config;
 
-        private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
-        private readonly string? FUNCTION_APP_NAME = Environment.GetEnvironmentVariable("FUNCTION_APP_NAME").ToLower();
-        private readonly string? FUNCTION_DEFAULT_KEY = Environment.GetEnvironmentVariable("FUNCTION_DEFAULT_KEY"); 
-        private readonly string CALL_RECORD_ID = "callRecordId";
+        private readonly GraphServiceClient _graphServiceClient;
+        private readonly BlobContainerClient _containerClient;
 
-        public SubscriptionService(ILoggerFactory loggerFactory)
+        public SubscriptionService(
+            GraphServiceClient graphServiceClient, 
+            BlobContainerClientFactory blobContainerClientFactory, 
+            AppConfig config, 
+            ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<SubscriptionService>();
-            _config = new AuthenticationConfig
-            {
-                Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
-                ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
-                ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
-            };
+            _config = config;
+
+            _graphServiceClient = graphServiceClient;
+            _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_SubscriptionList);
+            _containerClient.CreateIfNotExists();
         }
         
 
@@ -41,13 +43,9 @@ namespace App
         public async Task RunTimer([TimerTrigger("0 0 16 * * *")] TimerInfo myTimer)
         {
             _logger.LogInformation($"SubscriptionRenewal(cronjob) executed at: {DateTime.Now}");
-
             try
             {
-                var scopes = new[] { $"{_config.ApiUrl}.default" };
-
-                _logger.LogInformation("Running Function: CallMSGraphAsync");
-                await CallMSGraphAsync(scopes);
+                await CallMSGraphAsync();
             }
             catch (Exception ex)
             {
@@ -57,15 +55,9 @@ namespace App
 
         [Function("SubscriptionServiceHttp")]
         public async Task<HttpResponseData> RunHttp([HttpTrigger(AuthorizationLevel.Function, "get", "post")] HttpRequestData req){
-            _logger.LogInformation("SubscriptionRenewal(http) executed");
-
             try
             {
-                var scopes = new[] { $"{_config.ApiUrl}.default" };
-
-                _logger.LogInformation("Running Function: CallMSGraphAsync");
-                await CallMSGraphAsync(scopes);
-
+                await CallMSGraphAsync();
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.OK, "SubscriptionRenewal executed successfully.");
             }
             catch (Exception ex)
@@ -75,19 +67,14 @@ namespace App
             }
         }
 
-        private async Task CallMSGraphAsync(string[] scopes)
+        private async Task CallMSGraphAsync()
         {
             try
             {
-                var graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
-                var containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_SubscriptionList);
-                containerClient.CreateIfNotExists();
-
-                var subscriptionList = await LoadSubscriptionList(containerClient);
-
-                await RenewOrCreateCallRecordSubscriptions(graphServiceClient, subscriptionList);
-                await RenewOrCreateUserEventSubscriptions(graphServiceClient, subscriptionList);
-                await SaveSubscriptionList(containerClient, subscriptionList);
+                var subscriptions = await LoadSubscriptionList();
+                await ProcessCallRecordSubscriptions(subscriptions);
+                await ProcessUserEventSubscriptions(subscriptions);
+                await SaveSubscriptionList(subscriptions);
             }
             catch (ServiceException e)
             {
@@ -99,14 +86,14 @@ namespace App
             }
         }
 
-        private async Task<SubscriptionList> LoadSubscriptionList(BlobContainerClient containerClient)
+        private async Task<SubscriptionList> LoadSubscriptionList()
         {
-            var blobClient = containerClient.GetBlobClient(_config.SubscriptionListFileName);
+            var blobClient = _containerClient.GetBlobClient(_config.SubscriptionListFileName);
             if (!await blobClient.ExistsAsync())
             {
-                _logger.LogInformation("Subscription list does not exist. Creating a new one.");
+                _logger.LogInformation("No activate subscriptions. Creating an empty list now...");
                 var newList = new SubscriptionList { value = new List<SubscriptionInfo>() };
-                await SaveSubscriptionList(containerClient, newList);
+                await SaveSubscriptionList(newList);
                 return newList;
             }
 
@@ -116,41 +103,41 @@ namespace App
             return JsonConvert.DeserializeObject<SubscriptionList>(responseString);
         }
 
-        private async Task SaveSubscriptionList(BlobContainerClient containerClient, SubscriptionList subscriptionList)
+        private async Task SaveSubscriptionList(SubscriptionList subscriptions)
         {
-            var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptionList);
-            await UtilityFunction.SaveToBlobContainer(containerClient, jsonPayload, _config.SubscriptionListFileName);
-            _logger.LogInformation("Subscription list saved successfully.");
+            var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptions);
+            await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, _config.SubscriptionListFileName);
+            _logger.LogInformation("Subscriptions saved successfully.");
         }
 
-        private async Task RenewOrCreateCallRecordSubscriptions(GraphServiceClient graphServiceClient, SubscriptionList subscriptionList){
+        private async Task ProcessCallRecordSubscriptions(SubscriptionList subscriptions){
             _logger.LogInformation("Renew or Create CallRecord subscription");
 
-            var subscriptionDict = subscriptionList.value.ToDictionary(sub => sub.UserId, sub => sub.SubscriptionId);
+            var subscriptionDict = subscriptions.value.ToDictionary(sub => sub.UserId, sub => sub.SubscriptionId);
 
             // Renew
-            if (subscriptionDict.ContainsKey(CALL_RECORD_ID)){
-                await RenewSubscription(graphServiceClient, subscriptionDict[CALL_RECORD_ID]);
+            if (subscriptionDict.ContainsKey(_config.CallRecordId)){
+                await RenewSubscription(subscriptionDict[_config.CallRecordId]);
                 return;
             }
 
             // Create
             var subscription = MakeSubscriptionObject(false);
-            Subscription responseSubscription = await CreateSubscription(graphServiceClient, subscription);
+            Subscription responseSubscription = await CreateSubscription(subscription);
 
             if (responseSubscription != null){
-                SubscriptionInfo subscriptionInfo = new SubscriptionInfo(CALL_RECORD_ID, responseSubscription.Id);
-                subscriptionList.value.Add(subscriptionInfo);
+                SubscriptionInfo subscriptionInfo = new SubscriptionInfo(_config.CallRecordId, responseSubscription.Id);
+                subscriptions.value.Add(subscriptionInfo);
             }
         }
 
-        private async Task RenewOrCreateUserEventSubscriptions(GraphServiceClient graphServiceClient, SubscriptionList subscriptionList)
+        private async Task ProcessUserEventSubscriptions(SubscriptionList subscriptionList)
         {
             var subscriptionDict = subscriptionList.value.ToDictionary(sub => sub.UserId, sub => sub.SubscriptionId);
 
 
             _logger.LogInformation("Fetching users from Graph API...");
-            var users = await graphServiceClient.Users.GetAsync();
+            var users = await _graphServiceClient.Users.GetAsync();
             _logger.LogInformation($"Found {users.Value.Count} users.");
 
 
@@ -160,12 +147,12 @@ namespace App
                 
                 if (subscriptionDict.ContainsKey(user.Id))
                 {
-                    await RenewSubscription(graphServiceClient, subscriptionDict[user.Id]);
+                    await RenewSubscription(subscriptionDict[user.Id]);
                     continue;
                 }
 
                 var subscription = MakeSubscriptionObject(true, user.Id);
-                Subscription responseSubscription = await CreateSubscription(graphServiceClient, subscription);
+                Subscription responseSubscription = await CreateSubscription(subscription);
 
                 if (responseSubscription != null){
                     SubscriptionInfo subscriptionInfo = new SubscriptionInfo(user.Id, responseSubscription.Id);
@@ -178,10 +165,10 @@ namespace App
 
             string Resource = userEventMode ? $"/users/{userId}/events" : "/communications/callRecords";
             string changeType = userEventMode ? "created" : "created";
-            string urlCode = userEventMode ? "UserEventService" : "CallRecordService";
+            string urlCode = userEventMode ? "UserEventNotificationHandler" : "CallRecordNotificationHandler";
 
             string endpointTemplateString = "https://{0}.azurewebsites.net/api/{1}?code={2}&clientId=default";
-            string webhookUrl = String.Format(endpointTemplateString, FUNCTION_APP_NAME, urlCode, FUNCTION_DEFAULT_KEY);
+            string webhookUrl = String.Format(endpointTemplateString, _config.FUNCTION_APP_NAME, urlCode, _config.FUNCTION_DEFAULT_KEY);
 
             return new Subscription{
                 ChangeType = changeType,
@@ -193,7 +180,7 @@ namespace App
             };
         }
 
-        private async Task RenewSubscription(GraphServiceClient graphServiceClient, string subscriptionId)
+        private async Task RenewSubscription(string subscriptionId)
         {
             try
             {
@@ -202,7 +189,7 @@ namespace App
                 {
                     ExpirationDateTime = DateTime.UtcNow.AddDays(2),
                 };
-                await graphServiceClient.Subscriptions[subscriptionId].PatchAsync(subscriptionToUpdate);
+                await _graphServiceClient.Subscriptions[subscriptionId].PatchAsync(subscriptionToUpdate);
                 _logger.LogInformation("Subscription renewed successfully.");
             }
             catch (Exception ex)
@@ -211,11 +198,11 @@ namespace App
             }
         }
 
-        private async Task<Subscription> CreateSubscription(GraphServiceClient graphServiceClient, Subscription subscription)
+        private async Task<Subscription> CreateSubscription(Subscription subscription)
         {
             try
             {
-                var responseSubscription = await graphServiceClient.Subscriptions.PostAsync(subscription);
+                var responseSubscription = await _graphServiceClient.Subscriptions.PostAsync(subscription);
                 _logger.LogInformation("Subscription created successfully.");
                 return responseSubscription;
             }

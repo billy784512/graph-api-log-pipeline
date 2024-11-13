@@ -13,40 +13,39 @@ using Newtonsoft.Json;
 
 using App.Utils;
 using App.Models;
+using App.Factory;
 
 namespace App
 {
-    public class UserEventService
+    public class UserEventNotificationHandler
     {
         private readonly ILogger _logger;
-        private readonly AuthenticationConfig _config;
+        private readonly AppConfig _config;
 
-        private EventHubProducerClient _producerClient;
-        private BlobContainerClient _containerClient;
+        private readonly GraphServiceClient _graphServiceClient;
+        private readonly EventHubProducerClient _producerClient;
+        private readonly BlobContainerClient _containerClient;
 
-        private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
-
-        public UserEventService(ILoggerFactory loggerFactory)
+        public UserEventNotificationHandler(
+            GraphServiceClient graphServiceClient,
+            EventHubProducerClientFactory eventHubProducerClientFactory, 
+            BlobContainerClientFactory blobContainerClientFactory, 
+            AppConfig config, 
+            ILoggerFactory loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger<UserEventService>();
-            _config = new AuthenticationConfig
-            {
-                Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
-                ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
-                ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
-            };
-            _producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_UserEvents);
-            _containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_UserEvents);
+            _logger = loggerFactory.CreateLogger<UserEventNotificationHandler>();
+            _config = config;
+
+            _graphServiceClient = graphServiceClient;
+            _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_UserEvents);
+            _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_UserEvents);
+
             _containerClient.CreateIfNotExists();
         }
 
 
-        [Function("UserEventService")]
+        [Function("UserEventNotificationHandler")]
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
-            _logger.LogInformation("UserEventService is triggered.");
-
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
                 return await UtilityFunction.GraphNotificationValidationResponse(req);
@@ -82,13 +81,12 @@ namespace App
 
             try
             {
-                string[] scopes = [$"{_config.ApiUrl}.default"];
-                Event calendarEvent = await GetUserEventfromGraphSDK(scopes, userId, eventId);
+                Event calendarEvent = await GetUserEventFromGraphSDK(userId, eventId);
 
                 string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
 
-                bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
+                bool toggle = Convert.ToBoolean(_config.EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
                     await UtilityFunction.SendToEventHub(_producerClient, jsonPayload, fileName);
@@ -106,13 +104,11 @@ namespace App
             }
         }
 
-        private async Task<Event> GetUserEventfromGraphSDK(string[] scopes, string userId, string eventId)
+        private async Task<Event> GetUserEventFromGraphSDK(string userId, string eventId)
         {
-            GraphServiceClient graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
-
             try
             {
-                var userEvent = await graphServiceClient.Users[userId].Events[eventId]
+                var userEvent = await _graphServiceClient.Users[userId].Events[eventId]
                     .GetAsync();
                     
                 return userEvent;

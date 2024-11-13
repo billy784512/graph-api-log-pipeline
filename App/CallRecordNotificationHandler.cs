@@ -1,10 +1,10 @@
 using System.Net;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Graph;
 using Microsoft.Graph.Models.CallRecords;
+using Microsoft.Extensions.Logging;
 
 using Azure.Storage.Blobs;
 using Azure.Messaging.EventHubs.Producer;
@@ -13,39 +13,39 @@ using Newtonsoft.Json;
 
 using App.Utils;
 using App.Models;
+using App.Factory;
 
 namespace App
 {
-    public class CallRecordService
+    public class CallRecordNotificationHandler
     {
         private readonly ILogger _logger;
-        private readonly AuthenticationConfig _config;
+        private readonly AppConfig _config;
 
-        private EventHubProducerClient _producerClient;
-        private BlobContainerClient _containerClient;
-
-        private readonly string? BLOB_CONNECTION_STRING = Environment.GetEnvironmentVariable("BLOB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_CONNECTION_STRING = Environment.GetEnvironmentVariable("EVENT_HUB_CONNECTION_STRING");
-        private readonly string? EVENT_HUB_FEATURE_TOGGLE = Environment.GetEnvironmentVariable("EVENT_HUB_FEATURE_TOGGLE");
+        private readonly GraphServiceClient _graphServiceClient;
+        private readonly EventHubProducerClient _producerClient;
+        private readonly BlobContainerClient _containerClient;
         
-        public CallRecordService(ILoggerFactory loggerFactory)
+        public CallRecordNotificationHandler(
+            GraphServiceClient graphServiceClient, 
+            EventHubProducerClientFactory eventHubProducerClientFactory, 
+            BlobContainerClientFactory blobContainerClientFactory, 
+            AppConfig config, 
+            ILoggerFactory loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger<CallRecordService>();
-            _config = new AuthenticationConfig{
-                Tenant = Environment.GetEnvironmentVariable("TENANT_ID"),
-                ClientId = Environment.GetEnvironmentVariable("CLIENT_ID"),
-                ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET"),
-            };
-            _producerClient = new EventHubProducerClient(EVENT_HUB_CONNECTION_STRING, _config.EventHubTopic_CallRecords);
-            _containerClient = new BlobContainerClient(BLOB_CONNECTION_STRING, _config.BlobContainerName_CallRecords);
+            _logger = loggerFactory.CreateLogger<CallRecordNotificationHandler>();
+            _config = config;
+
+            _graphServiceClient = graphServiceClient;
+            _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_UserEvents);
+            _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_UserEvents);
+
             _containerClient.CreateIfNotExists();
         }
         
 
-        [Function("CallRecordService")]
+        [Function("CallRecordNotificationHandler")]
         public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequestData req){
-            _logger.LogInformation("CallRecordService is triggered.");
-
             bool isValidationProcess = req.Query["validationToken"] != null;
             if (isValidationProcess){
                 return await UtilityFunction.GraphNotificationValidationResponse(req);
@@ -70,13 +70,12 @@ namespace App
 
             try
             {
-                string[] scopes = [$"{_config.ApiUrl}.default"];
-                CallRecord callrecord = await GetCallRecordsfromGraphSDK(scopes, meetingID);
+                CallRecord callrecord = await GetCallRecordsfromGraphSDK(meetingID);
 
                 string fileName = $"{callrecord.Id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(callrecord);
 
-                bool toggle = Convert.ToBoolean(EVENT_HUB_FEATURE_TOGGLE);
+                bool toggle = Convert.ToBoolean(_config.EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
                     await UtilityFunction.SendToEventHub(_producerClient, jsonPayload, fileName);
@@ -94,13 +93,11 @@ namespace App
             }
         }
 
-        private async Task<CallRecord> GetCallRecordsfromGraphSDK(string[] scopes, string call_Id)
+        private async Task<CallRecord> GetCallRecordsfromGraphSDK(string call_Id)
         {
-            GraphServiceClient graphServiceClient = UtilityFunction.GetAuthenticatedGraphClient(_config.Tenant, _config.ClientId, _config.ClientSecret, scopes);
-
             try
             {
-                CallRecord callrecord = await graphServiceClient.Communications.CallRecords[call_Id]
+                CallRecord callrecord = await _graphServiceClient.Communications.CallRecords[call_Id]
                     .GetAsync(requestConfiguration => {
                         requestConfiguration.QueryParameters.Expand = new[] { "sessions($expand=segments)"};
                     });
