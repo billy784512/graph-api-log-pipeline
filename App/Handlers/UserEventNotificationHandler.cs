@@ -1,6 +1,6 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 
-using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Functions.Worker;
@@ -16,19 +16,20 @@ using App.Models;
 using App.Factory;
 
 
-namespace App
+namespace App.Handlers
 {
     public class UserEventNotificationHandler
     {
         private readonly ILogger _logger;
         private readonly AppConfig _config;
 
-        private readonly GraphServiceClient _graphServiceClient;
+        private readonly GraphApiRequestHandler _graphApiRequestHandler;
+        //private readonly GraphServiceClient _graphServiceClient;
         private readonly EventHubProducerClient _producerClient;
         private readonly BlobContainerClient _containerClient;
 
         public UserEventNotificationHandler(
-            GraphServiceClient graphServiceClient,
+            GraphApiRequestHandler graphApiRequestHandler,
             EventHubProducerClientFactory eventHubProducerClientFactory, 
             BlobContainerClientFactory blobContainerClientFactory, 
             AppConfig config, 
@@ -37,7 +38,7 @@ namespace App
             _logger = loggerFactory.CreateLogger<UserEventNotificationHandler>();
             _config = config;
 
-            _graphServiceClient = graphServiceClient;
+            _graphApiRequestHandler = graphApiRequestHandler;
             _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_UserEvents);
             _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_UserEvents);
 
@@ -56,6 +57,8 @@ namespace App
 
         private async Task<HttpResponseData> SendEvent(HttpRequestData req){
             string reqBody = await new StreamReader(req.Body).ReadToEndAsync();
+
+            // Parse HTTP payload to SubscriptionData object
             SubscriptionData subscriptionData;
             try
             {
@@ -63,26 +66,30 @@ namespace App
             }
             catch(JsonException ex)
             {
-                _logger.LogError($"Failed to deserialize request body: {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
                 return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to deserialize request body: {ex.Message}.");
             }
 
+
+            // Extract IDs from SubscriptionData object
             string resource = subscriptionData.value[0].resource;
             string pattern = @"Users/([^/]+)/Events/([^/]+)";
 
             Match match = Regex.Match(resource, pattern);
             if (! match.Success)
             {
-                _logger.LogError($"Regex match failed, raw data: {resource}");
+                _logger.LogError("Regex match failed, raw data: {data}", resource);
                 return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, "Regex match failed.");
             }
 
             string userId = match.Groups[1].Value;
             string eventId = match.Groups[2].Value;
 
+
+            // Get log via GraphAPI, then send log to target destination
             try
             {
-                Event calendarEvent = await GetUserEventFromGraphSDK(userId, eventId);
+                Event calendarEvent = await _graphApiRequestHandler.GetUserEvent(userId, eventId);
 
                 string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
@@ -100,26 +107,9 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.Message);
-                return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to redirect logs: {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to send log: {ex.Message}");
             }
-        }
-
-        private async Task<Event> GetUserEventFromGraphSDK(string userId, string eventId)
-        {
-            try
-            {
-                var userEvent = await _graphServiceClient.Users[userId].Events[eventId]
-                    .GetAsync();
-                    
-                return userEvent;
-            }
-            catch (ServiceException e)
-            {
-                _logger.LogInformation("GetUserEventfromGraphSDK Failed: " + $"{e}");
-            }
-
-            return null;
         }
     }
 }

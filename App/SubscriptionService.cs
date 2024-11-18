@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Net;
 
 using Microsoft.Graph;
@@ -13,6 +14,7 @@ using Newtonsoft.Json;
 using App.Utils;
 using App.Models;
 using App.Factory;
+using App.Handlers;
 
 
 namespace App
@@ -22,11 +24,11 @@ namespace App
         private readonly ILogger _logger;
         private readonly AppConfig _config;
 
-        private readonly GraphServiceClient _graphServiceClient;
+        private readonly GraphApiRequestHandler _graphApiRequestHandler;
         private readonly BlobContainerClient _containerClient;
 
         public SubscriptionService(
-            GraphServiceClient graphServiceClient, 
+            GraphApiRequestHandler graphApiRequestHandler,
             BlobContainerClientFactory blobContainerClientFactory, 
             AppConfig config, 
             ILoggerFactory loggerFactory)
@@ -34,13 +36,13 @@ namespace App
             _logger = loggerFactory.CreateLogger<SubscriptionService>();
             _config = config;
 
-            _graphServiceClient = graphServiceClient;
+            _graphApiRequestHandler = graphApiRequestHandler;
             _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_SubscriptionList);
             _containerClient.CreateIfNotExists();
         }
         
 
-        [Function("SubscriptionServiceCronjob")]
+        //[Function("SubscriptionServiceCronjob")]
         public async Task RunTimer([TimerTrigger("0 0 16 * * *")] TimerInfo myTimer)
         {
             _logger.LogInformation($"SubscriptionRenewal(cronjob) executed at: {DateTime.Now}");
@@ -50,7 +52,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to excute subscriptionRenewal(cronjob): {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
             }
         }
 
@@ -63,7 +65,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in RenewSubscription(http): {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to excute subscriptionRenewal(http): {ex.Message}");
             }
         }
@@ -72,10 +74,10 @@ namespace App
         {
             try
             {
-                var subscriptions = await LoadSubscriptionList();
+                var subscriptions = await LoadSubscriptions();
                 await ProcessCallRecordSubscriptions(subscriptions);
                 await ProcessUserEventSubscriptions(subscriptions);
-                await SaveSubscriptionList(subscriptions);
+                await SaveSubscriptions(subscriptions);
             }
             catch (ServiceException e)
             {
@@ -83,18 +85,19 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in CallMSGraphAsync: {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
             }
         }
 
-        private async Task<SubscriptionList> LoadSubscriptionList()
+        private async Task<SubscriptionList> LoadSubscriptions()
         {
             var blobClient = _containerClient.GetBlobClient(_config.SubscriptionListFileName);
+
             if (!await blobClient.ExistsAsync())
             {
                 _logger.LogInformation("No activate subscriptions. Creating an empty list now...");
                 var newList = new SubscriptionList { value = new List<SubscriptionInfo>() };
-                await SaveSubscriptionList(newList);
+                await SaveSubscriptions(newList);
                 return newList;
             }
 
@@ -104,7 +107,7 @@ namespace App
             return JsonConvert.DeserializeObject<SubscriptionList>(responseString);
         }
 
-        private async Task SaveSubscriptionList(SubscriptionList subscriptions)
+        private async Task SaveSubscriptions(SubscriptionList subscriptions)
         {
             var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptions);
             await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, _config.SubscriptionListFileName);
@@ -118,13 +121,13 @@ namespace App
 
             // Renew
             if (subscriptionDict.ContainsKey(_config.CallRecordId)){
-                await RenewSubscription(subscriptionDict[_config.CallRecordId]);
+                await _graphApiRequestHandler.RenewSubscription(subscriptionDict[_config.CallRecordId]);
                 return;
             }
 
             // Create
             var subscription = MakeSubscriptionObject(false);
-            Subscription responseSubscription = await CreateSubscription(subscription);
+            Subscription responseSubscription = await _graphApiRequestHandler.CreateSubscription(subscription);
 
             if (responseSubscription != null){
                 SubscriptionInfo subscriptionInfo = new SubscriptionInfo(_config.CallRecordId, responseSubscription.Id);
@@ -138,7 +141,7 @@ namespace App
 
 
             _logger.LogInformation("Fetching users from Graph API...");
-            var users = await _graphServiceClient.Users.GetAsync();
+            var users = await _graphApiRequestHandler.GetUSer();
             _logger.LogInformation($"Found {users.Value.Count} users.");
 
 
@@ -148,12 +151,12 @@ namespace App
                 
                 if (subscriptionDict.ContainsKey(user.Id))
                 {
-                    await RenewSubscription(subscriptionDict[user.Id]);
+                    await _graphApiRequestHandler.RenewSubscription(subscriptionDict[user.Id]);
                     continue;
                 }
 
                 var subscription = MakeSubscriptionObject(true, user.Id);
-                Subscription responseSubscription = await CreateSubscription(subscription);
+                Subscription responseSubscription = await _graphApiRequestHandler.CreateSubscription(subscription);
 
                 if (responseSubscription != null){
                     SubscriptionInfo subscriptionInfo = new SubscriptionInfo(user.Id, responseSubscription.Id);
@@ -179,39 +182,6 @@ namespace App
                 ClientState = "secretClientValue",
                 LatestSupportedTlsVersion = "v1_2"
             };
-        }
-
-        private async Task RenewSubscription(string subscriptionId)
-        {
-            try
-            {
-                _logger.LogInformation($"Renewing subscription: {subscriptionId}");
-                var subscriptionToUpdate = new Subscription
-                {
-                    ExpirationDateTime = DateTime.UtcNow.AddDays(2),
-                };
-                await _graphServiceClient.Subscriptions[subscriptionId].PatchAsync(subscriptionToUpdate);
-                _logger.LogInformation("Subscription renewed successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error renewing subscription: {ex.Message}");
-            }
-        }
-
-        private async Task<Subscription> CreateSubscription(Subscription subscription)
-        {
-            try
-            {
-                var responseSubscription = await _graphServiceClient.Subscriptions.PostAsync(subscription);
-                _logger.LogInformation("Subscription created successfully.");
-                return responseSubscription;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error creating subscription: {ex.Message}");
-                return null;
-            }
         }
     }
 }

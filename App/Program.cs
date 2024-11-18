@@ -8,6 +8,7 @@ using Azure.Identity;
 
 using App.Utils;
 using App.Factory;
+using App.Handlers;
 
 
 var host = new HostBuilder()
@@ -18,7 +19,7 @@ var host = new HostBuilder()
     })
     .ConfigureServices((context, services) => 
     {
-        // Register configurate 
+        // Register AppConfig 
         var config = context.Configuration.Get<AppConfig>() ?? throw new InvalidOperationException("AppConfig could not be loaded");
         services.AddSingleton(config);
         
@@ -40,6 +41,9 @@ var host = new HostBuilder()
 
             return new GraphServiceClient(credentials, scopes); 
         });
+        
+        // Register GraphApiRequestHandler
+        services.AddSingleton<GraphApiRequestHandler>();
     })
     .Build();
 

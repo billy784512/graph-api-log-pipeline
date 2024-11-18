@@ -1,8 +1,8 @@
 using System.Net;
+using System.Reflection;
 
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Graph;
 using Microsoft.Graph.Models.CallRecords;
 using Microsoft.Extensions.Logging;
 
@@ -16,19 +16,20 @@ using App.Models;
 using App.Factory;
 
 
-namespace App
+namespace App.Handlers
 {
     public class CallRecordNotificationHandler
     {
         private readonly ILogger _logger;
         private readonly AppConfig _config;
 
-        private readonly GraphServiceClient _graphServiceClient;
+        private readonly GraphApiRequestHandler _graphApiRequestHandler;
+        //private readonly GraphServiceClient _graphServiceClient;
         private readonly EventHubProducerClient _producerClient;
         private readonly BlobContainerClient _containerClient;
         
         public CallRecordNotificationHandler(
-            GraphServiceClient graphServiceClient, 
+            GraphApiRequestHandler graphApiRequestHandler,
             EventHubProducerClientFactory eventHubProducerClientFactory, 
             BlobContainerClientFactory blobContainerClientFactory, 
             AppConfig config, 
@@ -37,7 +38,7 @@ namespace App
             _logger = loggerFactory.CreateLogger<CallRecordNotificationHandler>();
             _config = config;
 
-            _graphServiceClient = graphServiceClient;
+            _graphApiRequestHandler = graphApiRequestHandler;
             _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_UserEvents);
             _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_UserEvents);
 
@@ -56,6 +57,8 @@ namespace App
 
         private async Task<HttpResponseData> SendEvent(HttpRequestData req){
             string reqBody = await new StreamReader(req.Body).ReadToEndAsync();
+
+            // Parse HTTP payload to SubscriptionData object
             SubscriptionData subscriptionData;
             try
             {
@@ -63,15 +66,19 @@ namespace App
             }
             catch(JsonException ex)
             {
-                _logger.LogError($"Failed to deserialize request body: {ex.Message}");
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to deserialize request body: {ex.Message}");
             }
 
+
+            // Extract IDs from SubscriptionData object
             string meetingID = subscriptionData.value[0].resourceData.id;
 
+
+            // Get log via GraphAPI, then send log to target destination
             try
             {
-                CallRecord callrecord = await GetCallRecordsfromGraphSDK(meetingID);
+                CallRecord callrecord = await _graphApiRequestHandler.GetCallRecords(meetingID);
 
                 string fileName = $"{callrecord.Id}.json";
                 string jsonPayload = System.Text.Json.JsonSerializer.Serialize(callrecord);
@@ -89,27 +96,9 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to redirect logs: {ex.Message}");
             }
-        }
-
-        private async Task<CallRecord> GetCallRecordsfromGraphSDK(string call_Id)
-        {
-            try
-            {
-                CallRecord callrecord = await _graphServiceClient.Communications.CallRecords[call_Id]
-                    .GetAsync(requestConfiguration => {
-                        requestConfiguration.QueryParameters.Expand = new[] { "sessions($expand=segments)"};
-                    });
-                    
-                return callrecord;
-            }
-            catch (ServiceException e)
-            {
-                _logger.LogInformation("GetCallRecordsfromGraphSDK Failed: " + $"{e}");
-            }
-            return null;
         }
     }
 }
