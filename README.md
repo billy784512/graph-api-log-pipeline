@@ -3,7 +3,8 @@
 This project leverages **Microsoft Graph API change notifications** to store logs from various activities for efficient retrieval and analysis. The project ensures structured log pipeline and storage.
 
 - **Microsoft Graph API**: A unified API endpoint to access data and services from the Microsoft ecosystem. This project focuses its change notification feature.
-  - **change notification**: When subscribed resource is changed (e.g. a subscribed user is listed to a canledar event), Microsoft Graph API will notify given webhook URL with log as payload.
+  - **change notification**: When subscribed resource is changed (e.g. a subscribed user is listed to a canledar event), Microsoft Graph API will notify given webhook URL.
+  - **retrieve log**: Query logs once the workers notified by change notification
 
 ## Features
 
@@ -13,18 +14,16 @@ This project leverages **Microsoft Graph API change notifications** to store log
 - **Subscription to specific resources:**
   - **User Events**: Logs user events such as calendar updates.
   - **Call Records**: Captures call record details for analysis.
-  - **Chat Messages**: Tracks chat messages, limited to **the chatroom in a call**.
+  - **Chat Messages**: Tracks chat messages, limited to **the chatroom within a call**.
 
 
 ## Overview of Subscribed Resource
 
-| **Resource Name** | **Description**                                                           | **Changed Type** | **Graph API Path**            |
-|-------------------|---------------------------------------------------------------------------|------------------|-------------------------------|
-| user (events)     | User-related events. (e.g. calendar changes)                              | Created          | `/user/{userId}/events`       |
-| callRecords       | Details of a Teams call.                                                  | Created          | `/communications/callRecords` |
-| chatMessages      | Mmessages in a chat. (in this project, only chat of call will be tracked) | X                | `/chats/{chatId}/messages`    |
-
-**Notice:** Because we only want to track messages in the chatroom in a call, we query chatMessages with `chatId` from Graph API directly, instead of creating a subscribtion.
+| **Resource Name** | **Description**                                | **Changed Type** | **Graph API Path**            |
+|-------------------|------------------------------------------------|------------------|-------------------------------|
+| user (events)     | User-related events. (e.g. calendar changes)   | Created          | `/user/{userId}/events`       |
+| callRecords       | Details of a Teams call.                       | Created          | `/communications/callRecords` |
+| chatMessages      | Messages in a chat. (only chat within a call)  | X                | `/chats/{chatId}/messages`    |
 
 ## Architecture
 
@@ -45,9 +44,9 @@ Creating subscriptions is the prerequisite to activate Graph API change notifica
 **Handling webhook requests**
 
 When subscribed resources changes, Microsoft Graph API will send notification to given webhook URL.
-- **Log Redirection Service** play as request handler, handling incoming notifications and redirecting the data.
-  - The incoming data will be parsed into JSON format.
-  - The destination of redirection can be Event Hub or Stroage Account. 
+- **Notification Handlers** Handling incoming notifications, quering logs from Graph API and sending logs to target destination.
+  - Logs will be converted to JSON format.
+  - The destinations can be either Event Hub or Stroage Account. 
 
 <br/>
 
@@ -55,7 +54,7 @@ When subscribed resources changes, Microsoft Graph API will send notification to
 
 - This project utilize Event Hub to implement asynchronous log storage.
   - There are several topics (by resource type).
-  - **Log Redirection Service** is the producer.
+  - **Handling webhook requests** is the producer.
   - **Azure Fabric** is the consumer.
 
 <br/>
@@ -69,24 +68,33 @@ Reference:
 
 Files not included are auto-generated or metadata.
 
-``` sh
-📂 App
-┣ 📂 Models
-┃ ┗ 📜 Subscription.cs
-┣ 📂 Utils
-┃ ┣ 📜 AuthenticationConfig.cs
-┃ ┗ 📜 UtilityFunction.cs
-┣ 📜App.csproj
-┣ 📜CallRecordService.cs             # Log Redirection Service
-┣ 📜host.json
-┣ 📜local.settings.json
-┣ 📜Program.cs
-┣ 📜SubscriptionService.cs           # Subscription Service
-┗ 📜UserEventService.cs              # Log Redirection Service
-📂 Scripts
-┣ 📜 azure_operation.ps1
-┣ 📜 functionApp_operation.ps1
-┗ 📜 req.ps1
+```sh
+📦teams-log-pipeline
+ ┣ 📂App
+ ┃ ┣ 📂Factory
+ ┃ ┃ ┣ 📜BlobContainerClientFactory.cs
+ ┃ ┃ ┗ 📜EventHubProducerClientFactory.cs
+ ┃ ┣ 📂Handlers
+ ┃ ┃ ┣ 📜CallRecordNotificationHandler.cs
+ ┃ ┃ ┣ 📜GraphApiRequestHandler.cs
+ ┃ ┃ ┗ 📜UserEventNotificationHandler.cs
+ ┃ ┣ 📂Models
+ ┃ ┃ ┗ 📜Subscription.cs
+ ┃ ┣ 📂Properties
+ ┃ ┃ ┗ 📜launchSettings.json
+ ┃ ┣ 📂Utils
+ ┃ ┃ ┣ 📜AppConfig.cs
+ ┃ ┃ ┣ 📜ErrorMessage.cs
+ ┃ ┃ ┗ 📜UtilityFunction.cs
+ ┃ ┣ 📜App.csproj
+ ┃ ┣ 📜host.json
+ ┃ ┣ 📜local.settings.json
+ ┃ ┣ 📜Program.cs
+ ┃ ┗ 📜SubscriptionService.cs
+ ┣ 📂Scripts
+ ┃ ┣ 📜azure_operation.ps1
+ ┃ ┣ 📜functionApp_operation.ps1
+ ┃ ┗ 📜req.ps1
 ```
 
 ## Prerequisites
