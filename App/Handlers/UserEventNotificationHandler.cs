@@ -24,7 +24,6 @@ namespace App.Handlers
         private readonly AppConfig _config;
 
         private readonly GraphApiRequestHandler _graphApiRequestHandler;
-        //private readonly GraphServiceClient _graphServiceClient;
         private readonly EventHubProducerClient _producerClient;
         private readonly BlobContainerClient _containerClient;
 
@@ -66,7 +65,7 @@ namespace App.Handlers
             }
             catch(JsonException ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to deserialize request body: {ex.Message}.");
             }
 
@@ -92,7 +91,7 @@ namespace App.Handlers
                 Event calendarEvent = await _graphApiRequestHandler.GetUserEvent(userId, eventId);
 
                 string fileName = $"{subscriptionData.value[0].resourceData.id}.json";
-                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(calendarEvent);
+                string jsonPayload = JsonConvert.SerializeObject(calendarEvent);
 
                 bool toggle = Convert.ToBoolean(_config.EVENT_HUB_FEATURE_TOGGLE);
 
@@ -107,7 +106,7 @@ namespace App.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return await UtilityFunction.MakeResponse(req, System.Net.HttpStatusCode.BadRequest, $"Failed to send log: {ex.Message}");
             }
         }

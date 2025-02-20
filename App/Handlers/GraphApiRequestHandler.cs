@@ -5,7 +5,6 @@ using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.CallRecords;
 using Microsoft.Extensions.Logging;
 
-
 using App.Utils;
 
 
@@ -16,7 +15,7 @@ namespace App.Handlers
         private readonly GraphServiceClient _graphServiceClient;
         private readonly ILogger _logger;
 
-        public GraphApiRequestHandler(GraphServiceClient graphServiceClient,  ILoggerFactory loggerFactory){
+        public GraphApiRequestHandler(GraphServiceClient graphServiceClient, ILoggerFactory loggerFactory){
             _graphServiceClient = graphServiceClient;
             _logger = loggerFactory.CreateLogger<GraphApiRequestHandler>();
         }
@@ -30,7 +29,7 @@ namespace App.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return null;
             }
         }
@@ -47,7 +46,7 @@ namespace App.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
             }
         }
 
@@ -59,7 +58,7 @@ namespace App.Handlers
             }
             catch(Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return null;
             }
         }
@@ -77,7 +76,7 @@ namespace App.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return null;
             }
         }
@@ -91,10 +90,22 @@ namespace App.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return null;
             }
+        }
 
+        public async Task<ChatMessageCollectionResponse> GetChatMessages(string chatId){
+            try{
+                var messages = await _graphServiceClient.Chats[chatId].Messages.GetAsync();
+                return messages;
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError("failed to fetch chat messages for chatId: {chatId}, {message}", chatId, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
+                return null;
+            }
         }
     }
 }

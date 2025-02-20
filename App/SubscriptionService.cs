@@ -42,7 +42,7 @@ namespace App
         }
         
 
-        //[Function("SubscriptionServiceCronjob")]
+        [Function("SubscriptionServiceCronjob")]
         public async Task RunTimer([TimerTrigger("0 0 16 * * *")] TimerInfo myTimer)
         {
             _logger.LogInformation($"SubscriptionRenewal(cronjob) executed at: {DateTime.Now}");
@@ -52,7 +52,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
             }
         }
 
@@ -65,7 +65,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to excute subscriptionRenewal(http): {ex.Message}");
             }
         }
@@ -85,7 +85,7 @@ namespace App
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
             }
         }
 
@@ -109,7 +109,7 @@ namespace App
 
         private async Task SaveSubscriptions(SubscriptionList subscriptions)
         {
-            var jsonPayload = System.Text.Json.JsonSerializer.Serialize(subscriptions);
+            var jsonPayload = JsonConvert.SerializeObject(subscriptions);
             await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, _config.SubscriptionListFileName);
             _logger.LogInformation("Subscriptions saved successfully.");
         }

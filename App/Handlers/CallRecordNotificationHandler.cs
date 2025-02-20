@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -14,6 +15,7 @@ using Newtonsoft.Json;
 using App.Utils;
 using App.Models;
 using App.Factory;
+using Microsoft.Graph.Models;
 
 
 namespace App.Handlers
@@ -24,8 +26,8 @@ namespace App.Handlers
         private readonly AppConfig _config;
 
         private readonly GraphApiRequestHandler _graphApiRequestHandler;
-        //private readonly GraphServiceClient _graphServiceClient;
         private readonly EventHubProducerClient _producerClient;
+        private readonly EventHubProducerClient _producerClient_msg;
         private readonly BlobContainerClient _containerClient;
         
         public CallRecordNotificationHandler(
@@ -39,7 +41,8 @@ namespace App.Handlers
             _config = config;
 
             _graphApiRequestHandler = graphApiRequestHandler;
-            _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_UserEvents);
+            _producerClient = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_CallRecords);
+            _producerClient_msg = eventHubProducerClientFactory.GetClient(_config.EventHubTopic_ChatMeesages);
             _containerClient = blobContainerClientFactory.GetClient(_config.BlobContainerName_UserEvents);
 
             _containerClient.CreateIfNotExists();
@@ -66,7 +69,7 @@ namespace App.Handlers
             }
             catch(JsonException ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to deserialize request body: {ex.Message}");
             }
 
@@ -77,28 +80,63 @@ namespace App.Handlers
 
             // Get log via GraphAPI, then send log to target destination
             try
-            {
+            {   
                 CallRecord callrecord = await _graphApiRequestHandler.GetCallRecords(meetingID);
 
+                string chatId = getChatId(callrecord.JoinWebUrl);
+
+                ChatMessageCollectionResponse messages = null; 
+                try
+                {
+                    await _graphApiRequestHandler.GetChatMessages(chatId);
+                }
+                catch(Exception ex)
+                {
+                    _logger.LogError("failed to fetch chat messages for chatId: {chatId}, {message}", chatId, ex.Message);
+                }
+
+
                 string fileName = $"{callrecord.Id}.json";
-                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(callrecord);
+                string jsonPayload = JsonConvert.SerializeObject(callrecord);
+
+                string fileName2 = $"{chatId}.json";
+                string jsonPayload2 = messages != null
+                    ? JsonConvert.SerializeObject(messages.Value) 
+                    : string.Empty;
 
                 bool toggle = Convert.ToBoolean(_config.EVENT_HUB_FEATURE_TOGGLE);
 
                 if (toggle){
                     await UtilityFunction.SendToEventHub(_producerClient, jsonPayload, fileName);
+
+                    if (!string.IsNullOrEmpty(jsonPayload2))
+                    {
+                        await UtilityFunction.SendToEventHub(_producerClient_msg, jsonPayload2, fileName2);
+                    }
                     return await UtilityFunction.MakeResponse(req, HttpStatusCode.Accepted, "Send log to Event Hub successfully.");
                 }
                 else{
                     await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, fileName);
+                    await UtilityFunction.SaveToBlobContainer(_containerClient, jsonPayload, fileName2);
                     return await UtilityFunction.MakeResponse(req, HttpStatusCode.Accepted, "Save log to Sotrage Account successfully.");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, MethodBase.GetCurrentMethod().Name, ex.Message);
+                _logger.LogError(ErrorMessage.ERR_METHOD_EXECUTE, UtilityFunction.GetCurrentMethodName(), ex.Message);
                 return await UtilityFunction.MakeResponse(req, HttpStatusCode.BadRequest, $"Failed to redirect logs: {ex.Message}");
             }
+        }
+
+        private string getChatId(string url){
+            Regex rx = new Regex(@"19%3ameeting.*thread\.v2", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            MatchCollection matches = rx.Matches(url);
+
+            if (matches.Count == 0){
+                return null;
+            }
+
+            return matches[0].Value;
         }
     }
 }

@@ -7,6 +7,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Azure.Storage.Blobs;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
+using System.Runtime.CompilerServices;
 
 namespace App.Utils
 {
@@ -27,6 +28,10 @@ namespace App.Utils
             string body = await reader.ReadToEndAsync();
 
             log.LogInformation($"Request Body: {body}"); 
+        }
+
+        public static string GetCurrentMethodName([CallerMemberName] string methodName = ""){
+            return methodName;
         }
 
         public static async Task<HttpResponseData> MakeResponse(HttpRequestData req, HttpStatusCode statusCode, string message){
